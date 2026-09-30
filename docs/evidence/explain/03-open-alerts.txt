@@ -1,0 +1,46 @@
+# Open-alerts feed: without vs with the partial index (tenant_id, ts DESC) WHERE status = 'OPEN'
+==================== BEFORE ====================
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.212..0.311 rows=51 loops=1)
+   Buffers: shared hit=23
+   ->  Incremental Sort (actual time=0.211..0.305 rows=51 loops=1)
+         Sort Key: ts DESC, alert_id DESC
+         Presorted Key: ts
+         Full-sort Groups: 2  Sort Method: quicksort  Average Memory: 29kB  Peak Memory: 29kB
+         Buffers: shared hit=23
+         ->  Result (actual time=0.065..0.216 rows=52 loops=1)
+               One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+               Buffers: shared hit=14
+               ->  Index Scan using alert_tenant_ts on alert (actual time=0.057..0.199 rows=52 loops=1)
+                     Index Cond: (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                     Filter: (status = 'OPEN'::text)
+                     Buffers: shared hit=14
+ Planning:
+   Buffers: shared hit=162
+ Planning Time: 0.857 ms
+ Execution Time: 0.412 ms
+(18 rows)
+
+==================== AFTER ====================
+                                                                       QUERY PLAN                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.204..0.243 rows=51 loops=1)
+   Buffers: shared hit=23
+   ->  Incremental Sort (actual time=0.202..0.238 rows=51 loops=1)
+         Sort Key: ts DESC, alert_id DESC
+         Presorted Key: ts
+         Full-sort Groups: 2  Sort Method: quicksort  Average Memory: 29kB  Peak Memory: 29kB
+         Buffers: shared hit=23
+         ->  Result (actual time=0.055..0.164 rows=52 loops=1)
+               One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+               Buffers: shared hit=14
+               ->  Index Scan using alert_open_tenant_ts on alert (actual time=0.048..0.147 rows=52 loops=1)
+                     Index Cond: (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                     Buffers: shared hit=14
+ Planning:
+   Buffers: shared hit=187
+ Planning Time: 0.881 ms
+ Execution Time: 0.313 ms
+(17 rows)
+

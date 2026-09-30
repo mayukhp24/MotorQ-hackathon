@@ -1,0 +1,16 @@
+# Pipeline stage micro-benchmarks (single core, -cpu 1)
+# CPU: Intel(R) Xeon(R) Processor @ 2.80GHz, 4 vCPU shared with the running compose stack; go1.26.0
+# Command: go test -run XXX -bench . -benchtime 3s -cpu 1 ./internal/processor ./internal/ingest ./internal/stream ./internal/oem ./internal/vin
+# Processor and gateway figures exclude Kafka client I/O.
+
+BenchmarkProcess 	      80	  43199741 ns/op	    115742 events/s	 6955098 B/op	   49304 allocs/op
+ok  	fleetpulse/pipeline/internal/processor	4.505s
+BenchmarkGatewayHandle 	     843	   4778024 ns/op	    104646 records/s	  332246 B/op	    7161 allocs/op
+ok  	fleetpulse/pipeline/internal/ingest	4.577s
+BenchmarkDedup   	11545969	       274.8 ns/op
+BenchmarkGeohash 	26722632	       123.3 ns/op
+ok  	fleetpulse/pipeline/internal/stream	12.377s
+BenchmarkAuroraDecode 	  248977	     16621 ns/op	  41.94 MB/s
+ok  	fleetpulse/pipeline/internal/oem	9.917s
+BenchmarkValidate 	11079327	       318.8 ns/op
+ok  	fleetpulse/pipeline/internal/vin	6.908s

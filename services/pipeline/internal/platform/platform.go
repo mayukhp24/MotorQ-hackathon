@@ -178,6 +178,16 @@ func kafkaSecurity() ([]kgo.Opt, error) {
 	return opts, nil
 }
 
+// GroupLiveness bounds how long a crashed (not gracefully stopped) group
+// member keeps its partitions: the default 45 s session timeout would stall
+// critical alerts for those partitions far beyond the 5 s objective.
+func GroupLiveness() []kgo.Opt {
+	return []kgo.Opt{
+		kgo.SessionTimeout(EnvDuration("KAFKA_SESSION_TIMEOUT", 10*time.Second)),
+		kgo.HeartbeatInterval(EnvDuration("KAFKA_HEARTBEAT_INTERVAL", 2*time.Second)),
+	}
+}
+
 // NewKafka builds a franz-go client with production defaults: idempotent
 // producer, acks=all, lz4 compression, bounded buffering for back-pressure.
 func NewKafka(extra ...kgo.Opt) (*kgo.Client, error) {

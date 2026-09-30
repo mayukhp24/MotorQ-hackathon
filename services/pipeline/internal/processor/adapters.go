@@ -189,7 +189,7 @@ func (p *PGMeta) LoadWithRetry(ctx context.Context, attempts int, log *slog.Logg
 func Run(ctx context.Context, p *Processor, group string, log *slog.Logger) error {
 	var cl *kgo.Client
 	var err error
-	cl, err = platform.NewKafka(
+	cl, err = platform.NewKafka(append(platform.GroupLiveness(),
 		kgo.ConsumerGroup(group),
 		kgo.ConsumeTopics(platform.TopicTelemetry),
 		kgo.DisableAutoCommit(),
@@ -209,7 +209,7 @@ func Run(ctx context.Context, p *Processor, group string, log *slog.Logger) erro
 		kgo.OnPartitionsAssigned(func(_ context.Context, _ *kgo.Client, m map[string][]int32) {
 			log.Info("partitions assigned", "partitions", m[platform.TopicTelemetry])
 		}),
-	)
+	)...)
 	if err != nil {
 		return err
 	}

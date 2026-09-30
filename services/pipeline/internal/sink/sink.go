@@ -91,12 +91,12 @@ func Write(ctx context.Context, db DB, b *pgx.Batch) error {
 
 // Run consumes alerts and trips until ctx is done.
 func Run(ctx context.Context, db DB, log *slog.Logger) error {
-	cl, err := platform.NewKafka(
+	cl, err := platform.NewKafka(append(platform.GroupLiveness(),
 		kgo.ConsumerGroup(platform.Env("SINK_GROUP", "sink-writer")),
 		kgo.ConsumeTopics(platform.TopicAlerts, platform.TopicTrips),
 		kgo.DisableAutoCommit(),
 		kgo.BlockRebalanceOnPoll(),
-	)
+	)...)
 	if err != nil {
 		return err
 	}

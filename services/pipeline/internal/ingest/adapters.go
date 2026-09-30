@@ -73,6 +73,11 @@ type MQTTConfig struct {
 	Password string
 	Topic    string      // e.g. $share/ingest/fleetpulse/oem/+/telemetry
 	TLS      *tls.Config // ssl:// brokers; carries the client certificate for mTLS
+	// Persistent sessions must only be used with stable client IDs: a
+	// replica that goes away for good (rollout, scale-in) otherwise leaves an
+	// offline member in the shared subscription that keeps receiving - and
+	// losing - its share of messages.
+	PersistentSession bool
 }
 
 // oemFromTopic extracts {oem} from fleetpulse/oem/{oem}/telemetry.
@@ -91,7 +96,7 @@ func oemFromTopic(topic string) string {
 // PUBACKs and makes the broker hold (not drop) QoS 1 messages.
 func StartMQTT(ctx context.Context, cfg MQTTConfig, g *Gateway, log *slog.Logger) (mqtt.Client, error) {
 	opts := mqtt.NewClientOptions().AddBroker(cfg.URL).SetClientID(cfg.ClientID).
-		SetCleanSession(false).SetAutoReconnect(true).SetConnectRetry(true).
+		SetCleanSession(!cfg.PersistentSession).SetAutoReconnect(true).SetConnectRetry(true).
 		SetConnectRetryInterval(2 * time.Second).SetOrderMatters(false).
 		SetKeepAlive(30 * time.Second)
 	if cfg.Username != "" {

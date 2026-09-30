@@ -1,0 +1,62 @@
+# Riskiest vehicles: DISTINCT ON over score history vs materialised current-risk read model
+==================== BEFORE ====================
+                                                                                QUERY PLAN                                                                                
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=2905.231..2905.254 rows=51 loops=1)
+   Buffers: shared hit=144076
+   ->  Sort (actual time=2905.229..2905.246 rows=51 loops=1)
+         Sort Key: x.risk_7d DESC, x.vin DESC
+         Sort Method: top-N heapsort  Memory: 30kB
+         Buffers: shared hit=144076
+         ->  Subquery Scan on x (actual time=2762.408..2904.454 rows=1356 loops=1)
+               Filter: (x.risk_7d >= '0.2'::double precision)
+               Rows Removed by Filter: 53644
+               Buffers: shared hit=144070
+               ->  Unique (actual time=2762.368..2896.979 rows=55000 loops=1)
+                     Buffers: shared hit=144070
+                     ->  Sort (actual time=2762.362..2798.668 rows=311811 loops=1)
+                           Sort Key: r.vin, r.scored_on DESC
+                           Sort Method: quicksort  Memory: 28425kB
+                           Buffers: shared hit=144070
+                           ->  Result (actual time=47.893..553.983 rows=311811 loops=1)
+                                 One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                                 Buffers: shared hit=144067
+                                 ->  Hash Join (actual time=47.882..526.519 rows=311811 loops=1)
+                                       Hash Cond: (r.model_version = mv.model_version)
+                                       Buffers: shared hit=144067
+                                       ->  Index Scan using risk_score_tenant_day on risk_score r (actual time=0.079..381.363 rows=623622 loops=1)
+                                             Index Cond: (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                                             Buffers: shared hit=144066
+                                       ->  Hash (actual time=0.016..0.018 rows=1 loops=1)
+                                             Buckets: 1024  Batches: 1  Memory Usage: 9kB
+                                             Buffers: shared hit=1
+                                             ->  Seq Scan on model_version mv (actual time=0.010..0.010 rows=1 loops=1)
+                                                   Filter: is_active
+                                                   Rows Removed by Filter: 1
+                                                   Buffers: shared hit=1
+ Planning:
+   Buffers: shared hit=338
+ Planning Time: 1.256 ms
+ Execution Time: 2910.654 ms
+(36 rows)
+
+==================== AFTER ====================
+                                                                           QUERY PLAN                                                                            
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=7.202..7.210 rows=51 loops=1)
+   Buffers: shared hit=1378
+   ->  Sort (actual time=7.199..7.203 rows=51 loops=1)
+         Sort Key: vehicle_risk_current.risk_7d DESC, vehicle_risk_current.vin DESC
+         Sort Method: top-N heapsort  Memory: 28kB
+         Buffers: shared hit=1378
+         ->  Subquery Scan on vehicle_risk_current (actual time=0.077..6.857 rows=1356 loops=1)
+               Buffers: shared hit=1372
+               ->  Index Scan using mv_vehicle_risk_current_tenant_risk on mv_vehicle_risk_current (actual time=0.076..6.731 rows=1356 loops=1)
+                     Index Cond: ((tenant_id = (NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid) AND (risk_7d >= '0.2'::double precision))
+                     Buffers: shared hit=1372
+ Planning:
+   Buffers: shared hit=155
+ Planning Time: 0.841 ms
+ Execution Time: 7.282 ms
+(15 rows)
+

@@ -1,0 +1,30 @@
+# ClickHouse: one vehicle's last 6 h of telemetry - sort-key prefix (tenant_id, vin, ts) vs the same
+# predicate hidden behind a function on the key column (defeats primary-key pruning)
+
+== SELECT toStartOfMinute(ts) m, avg(speed_kmh), max(coolant_c) FROM fleet.telemetry WHERE tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6' AND vin = 'AURCGD4X0JA003528' AND ts >= now() - INTERVAL 6 HOUR GROUP BY m
+            Keys: 
+            Condition: (ts in [\'1790777463\', +Inf))
+            Parts: 12/12
+            Granules: 8386/8386
+            Keys: 
+            Condition: (toYYYYMMDD(ts) in [20260930, +Inf))
+            Parts: 12/12
+            Granules: 8386/8386
+            Keys: 
+            Condition: and((ts in [\'1790777463\', +Inf)), and((vin in [\'AURCGD4X0JA003528\', \'AURCGD4X0JA003528\']), (tenant_id in [\'5119df4b-7356-5c21-8e7b-20e0ccaa3bf6\', \'5119df4b-7356-5c21-8e7b-20e0ccaa3bf6\'])))
+            Parts: 12/12
+            Granules: 13/8386
+
+== SELECT toStartOfMinute(ts) m, avg(speed_kmh), max(coolant_c) FROM fleet.telemetry WHERE lower(toString(vin)) = lower('AURCGD4X0JA003528') AND ts >= now() - INTERVAL 6 HOUR GROUP BY m
+            Keys: 
+            Condition: (ts in [\'1790777464\', +Inf))
+            Parts: 12/12
+            Granules: 8386/8386
+            Keys: 
+            Condition: (toYYYYMMDD(ts) in [20260930, +Inf))
+            Parts: 12/12
+            Granules: 8386/8386
+            Keys: 
+            Condition: (ts in [\'1790777464\', +Inf))
+            Parts: 12/12
+            Granules: 8386/8386

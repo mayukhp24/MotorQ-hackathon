@@ -112,6 +112,46 @@ def wait_http(url: str, timeout_s: float = 180) -> float:
     raise TimeoutError(url)
 
 
+def murmur2(data: bytes) -> int:
+    """Kafka's default key hash (Java client and franz-go agree)."""
+    m, h = 0x5BD1E995, (0x9747B28C ^ len(data)) & 0xFFFFFFFF
+    n4 = len(data) // 4
+    for i in range(n4):
+        k = int.from_bytes(data[i * 4:i * 4 + 4], "little")
+        k = (k * m) & 0xFFFFFFFF
+        k ^= k >> 24
+        k = (k * m) & 0xFFFFFFFF
+        h = ((h * m) & 0xFFFFFFFF) ^ k
+    rest, tail = len(data) % 4, n4 * 4
+    if rest == 3:
+        h ^= data[tail + 2] << 16
+    if rest >= 2:
+        h ^= data[tail + 1] << 8
+    if rest >= 1:
+        h ^= data[tail]
+        h = (h * m) & 0xFFFFFFFF
+    h ^= h >> 13
+    h = (h * m) & 0xFFFFFFFF
+    h ^= h >> 15
+    return h
+
+
+def partition_of(vin: str, partitions: int = int(os.environ.get("TELEMETRY_PARTITIONS", "12"))) -> int:
+    return (murmur2(vin.encode()) & 0x7FFFFFFF) % partitions
+
+
+def partitions_owned_by(group: str, container_name: str) -> set[int]:
+    ip = sh("docker", "inspect", "-f", "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}", container_name)
+    out = sh("docker", "exec", container("kafka"), "/opt/kafka/bin/kafka-consumer-groups.sh",
+             "--bootstrap-server", "localhost:9092", "--describe", "--group", group, check=False)
+    owned = set()
+    for line in out.splitlines():
+        cols = line.split()
+        if len(cols) >= 8 and cols[2].isdigit() and cols[7].lstrip("/") == ip:
+            owned.add(int(cols[2]))
+    return owned
+
+
 def consumer_lag(group: str) -> int:
     out = sh("docker", "exec", container("kafka"), "/opt/kafka/bin/kafka-consumer-groups.sh",
              "--bootstrap-server", "localhost:9092", "--describe", "--group", group, check=False)
@@ -138,9 +178,15 @@ def kill_processor(c: Client) -> Result:
     r = Result("Stream-processor crash", "SIGKILL one of two stream-processor replicas",
                "partitions fail over to the survivor; the alert is still raised; lag drains")
     victim = container("stream-processor", 1)
+    owned = partitions_owned_by("stream-processor", victim)
+    candidates = [v for v in c.vins if partition_of(v) in owned]
+    if not owned or not candidates:
+        raise RuntimeError(f"could not find a probe vehicle on {victim}'s partitions {sorted(owned)}")
+    vin = candidates[0]
+    c.vins.remove(vin)
     sh("docker", "kill", victim)
-    r.note(f"killed {victim}")
-    vin, t0 = c.probe_vin(), time.time()
+    r.note(f"killed {victim} (owned partitions {sorted(owned)}); probe vehicle is on partition {partition_of(vin)}")
+    t0 = time.time()
     c.overheat(vin).raise_for_status()
     lat = c.wait_alert(vin, t0, 90)
     r.note(f"alert delivered after {lat:.1f} s (includes consumer-group rebalance)" if lat else "alert NOT delivered")
@@ -184,7 +230,7 @@ def restart_kafka(c: Client) -> Result:
 
 def stop_clickhouse(c: Client) -> Result:
     r = Result("ClickHouse outage", "stop ClickHouse for 30 s",
-               "operational reads (Postgres/Redis) unaffected; analytics fail fast with a problem response; recovers")
+               "operational reads (Postgres/Redis) unaffected; history/analytics answer fast with degraded=true; recover")
     vin = c.vins[0]
     sh("docker", "stop", container("clickhouse"))
     time.sleep(2)
@@ -193,21 +239,25 @@ def stop_clickhouse(c: Client) -> Result:
     detail = c.get(f"/vehicles/{vin}").status_code
     ana = c.get("/analytics/fleet-hourly", params={"hours": 24})
     r.note(f"/fleet/summary -> {core}, /vehicles/{{vin}} -> {detail}, "
-           f"/analytics/fleet-hourly -> {ana.status_code} in {time.time() - t:.2f} s total")
+           f"/analytics/fleet-hourly -> {ana.status_code} degraded={ana.json().get('degraded')} "
+           f"in {time.time() - t:.2f} s total")
     fast = [c.get("/vehicles/" + vin + "/telemetry", params={"minutes": 60}) for _ in range(3)]
-    r.note("telemetry history during outage: " + ", ".join(f"{x.status_code} ({x.elapsed.total_seconds():.2f}s)" for x in fast))
+    r.note("telemetry history during outage: " + ", ".join(
+        f"{x.status_code} degraded={x.json().get('degraded')} ({x.elapsed.total_seconds():.2f}s)" for x in fast))
+    degraded_ok = all(x.status_code == 200 and x.json().get("degraded") for x in fast)
     time.sleep(28)
     sh("docker", "start", container("clickhouse"))
     wait_http("http://localhost:8123/ping")
     t1 = time.time()
     ok = False
     while time.time() - t1 < 120:
-        if c.get("/analytics/fleet-hourly", params={"hours": 24}).status_code == 200:
+        x = c.get("/analytics/fleet-hourly", params={"hours": 24})
+        if x.status_code == 200 and not x.json().get("degraded"):
             ok = True
             break
         time.sleep(2)
     r.note(f"analytics recovered {time.time() - t1:.1f} s after ClickHouse came back" if ok else "analytics did not recover")
-    r.passed = core == 200 and detail == 200 and ana.status_code in (200, 503) and ok
+    r.passed = core == 200 and detail == 200 and degraded_ok and ok
     return r
 
 

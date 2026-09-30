@@ -1,0 +1,122 @@
+# Driver safety ranking (30 days): aggregate over trips vs mv_driver_safety
+==================== BEFORE ====================
+                                                                                                                       QUERY PLAN                                                                                                                       
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=2006.033..2006.063 rows=20 loops=1)
+   Buffers: shared hit=53559 read=2
+   ->  Sort (actual time=2006.031..2006.058 rows=20 loops=1)
+         Sort Key: (GREATEST('0'::numeric, (('100'::numeric - ((((sum((t.harsh_brakes + t.harsh_accels)))::numeric * 100.0) / sum(t.distance_km)) * '6'::numeric)) - (((((sum(t.overspeed_s))::numeric / 60.0) * 100.0) / sum(t.distance_km)) * 1.5))))
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=53559 read=2
+         ->  HashAggregate (actual time=1938.172..1998.851 rows=31358 loops=1)
+               Group Key: t.driver_id
+               Filter: (sum(t.distance_km) >= '50'::numeric)
+               Batches: 1  Memory Usage: 15889kB
+               Buffers: shared hit=53556 read=2
+               ->  Append (actual time=0.309..764.224 rows=1349347 loops=1)
+                     Buffers: shared hit=53556 read=2
+                     Subplans Removed: 7
+                     ->  Result (actual time=0.021..0.023 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2026_08 t_1 (actual time=0.009..0.010 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.286..635.834 rows=1349339 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           Buffers: shared hit=53555 read=2
+                           ->  Index Only Scan using trip_2026_09_tenant_id_start_ts_driver_id_distance_km_harsh_idx on trip_2026_09 t_2 (actual time=0.283..472.165 rows=1349339 loops=1)
+                                 Index Cond: ((tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                                 Filter: (driver_id IS NOT NULL)
+                                 Heap Fetches: 48437
+                                 Buffers: shared hit=53555 read=2
+                     ->  Result (actual time=0.054..0.059 rows=8 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           Buffers: shared hit=1
+                           ->  Seq Scan on trip_2026_10 t_3 (actual time=0.040..0.044 rows=8 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                                 Buffers: shared hit=1
+                     ->  Result (actual time=0.007..0.007 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2026_11 t_4 (actual time=0.005..0.005 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.006..0.007 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2026_12 t_5 (actual time=0.003..0.003 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.005..0.007 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_01 t_6 (actual time=0.003..0.003 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.008..0.009 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_02 t_7 (actual time=0.006..0.006 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.006..0.007 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_03 t_8 (actual time=0.003..0.004 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.005..0.005 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_04 t_9 (actual time=0.002..0.003 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.006..0.007 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_05 t_10 (actual time=0.003..0.004 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.007..0.008 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_06 t_11 (actual time=0.005..0.005 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.006..0.007 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_07 t_12 (actual time=0.004..0.004 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.005..0.006 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_08 t_13 (actual time=0.003..0.004 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.005..0.005 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_09 t_14 (actual time=0.003..0.003 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.008..0.009 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_10 t_15 (actual time=0.006..0.006 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.005..0.006 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_11 t_16 (actual time=0.003..0.003 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.005..0.006 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_2027_12 t_17 (actual time=0.003..0.003 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+                     ->  Result (actual time=0.005..0.006 rows=0 loops=1)
+                           One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+                           ->  Seq Scan on trip_default t_18 (actual time=0.003..0.004 rows=0 loops=1)
+                                 Filter: ((driver_id IS NOT NULL) AND (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (start_ts >= (now() - '30 days'::interval)))
+ Planning:
+   Buffers: shared hit=2762
+ Planning Time: 12.362 ms
+ Execution Time: 2009.663 ms
+(96 rows)
+
+==================== AFTER ====================
+                                                               QUERY PLAN                                                               
+----------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=36.387..36.393 rows=20 loops=1)
+   Buffers: shared hit=31788
+   ->  Sort (actual time=36.385..36.389 rows=20 loops=1)
+         Sort Key: driver_safety.score
+         Sort Method: top-N heapsort  Memory: 27kB
+         Buffers: shared hit=31788
+         ->  Subquery Scan on driver_safety (actual time=0.330..29.734 rows=31358 loops=1)
+               Buffers: shared hit=31785
+               ->  Index Scan using mv_driver_safety_pk on mv_driver_safety (actual time=0.329..27.019 rows=31358 loops=1)
+                     Index Cond: ((tenant_id = (NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid) AND (days = 30))
+                     Buffers: shared hit=31785
+ Planning:
+   Buffers: shared hit=157 dirtied=5
+ Planning Time: 1.048 ms
+ Execution Time: 36.457 ms
+(15 rows)
+

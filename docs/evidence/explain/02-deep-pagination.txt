@@ -1,0 +1,35 @@
+# Page 1,000 of the vehicle list: OFFSET vs keyset (vin > cursor)
+==================== BEFORE ====================
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=40.372..40.423 rows=51 loops=1)
+   Buffers: shared hit=50346
+   ->  Result (actual time=0.099..38.596 rows=50051 loops=1)
+         One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+         Buffers: shared hit=50346
+         ->  Index Scan using vehicle_tenant_vin on vehicle v (actual time=0.087..31.745 rows=50051 loops=1)
+               Index Cond: (tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+               Buffers: shared hit=50346
+ Planning:
+   Buffers: shared hit=141
+ Planning Time: 0.787 ms
+ Execution Time: 40.500 ms
+(12 rows)
+
+==================== AFTER ====================
+                                                                    QUERY PLAN                                                                    
+--------------------------------------------------------------------------------------------------------------------------------------------------
+ Limit (actual time=0.676..1.098 rows=51 loops=1)
+   Buffers: shared hit=54 read=1
+   ->  Result (actual time=0.674..1.088 rows=51 loops=1)
+         One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+         Buffers: shared hit=54 read=1
+         ->  Index Scan using vehicle_tenant_vin on vehicle v (actual time=0.666..1.064 rows=51 loops=1)
+               Index Cond: ((tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (vin > 'STLDRX6DXPB019193'::bpchar))
+               Buffers: shared hit=54 read=1
+ Planning:
+   Buffers: shared hit=144
+ Planning Time: 0.897 ms
+ Execution Time: 1.162 ms
+(12 rows)
+

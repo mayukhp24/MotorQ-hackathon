@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -61,13 +62,17 @@ func main() {
 	platform.ServeOps(ctx, platform.Env("OPS_ADDR", ":9101"), ready, log, nil)
 
 	if url := platform.Env("MQTT_URL", ""); url != "" {
+		// MQTT_CLIENT_ID should be stable across restarts (e.g. a StatefulSet
+		// ordinal) before enabling MQTT_PERSISTENT_SESSION.
 		host, _ := os.Hostname()
+		clientID := platform.Env("MQTT_CLIENT_ID", "gw-"+host)
+		persistent := strings.EqualFold(platform.Env("MQTT_PERSISTENT_SESSION", "false"), "true")
 		tlsCfg, err := platform.ClientTLS("MQTT")
 		if err != nil {
 			log.Error("mqtt tls", "err", err)
 			os.Exit(1)
 		}
-		_, err = ingest.StartMQTT(ctx, ingest.MQTTConfig{URL: url, ClientID: "gw-" + host,
+		_, err = ingest.StartMQTT(ctx, ingest.MQTTConfig{URL: url, ClientID: clientID, PersistentSession: persistent,
 			Username: platform.Env("MQTT_USERNAME", ""), Password: platform.Env("MQTT_PASSWORD", ""),
 			Topic: platform.Env("MQTT_TOPIC", "$share/ingest/fleetpulse/oem/+/telemetry"), TLS: tlsCfg}, g, log)
 		if err != nil {

@@ -62,7 +62,7 @@ jobs:
         with: {name: api-test-reports, path: "services/fleet-api/coverage.xml\nservices/fleet-api/junit.xml"}
 
   analytics:
-    name: Analytics – lint, model tests
+    name: Analytics – lint, model + Testcontainers job tests
     runs-on: ubuntu-latest
     defaults: {run: {working-directory: services/analytics}}
     steps:
@@ -71,7 +71,8 @@ jobs:
         with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: services/analytics/pyproject.toml}
       - run: pip install -e ".[test]" ruff==0.8.4
       - run: ruff check .
-      - run: pytest --cov=analytics --cov-report=term --cov-report=xml
+      - name: Tests (model unit tests + jobs against real Postgres/pgvector)
+        run: pytest --cov=analytics --cov-report=term --cov-report=xml --cov-fail-under=80
         env: {OMP_NUM_THREADS: "2"}
 
   web:

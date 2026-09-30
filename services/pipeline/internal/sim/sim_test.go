@@ -331,6 +331,27 @@ func TestRunner_DeliversWithDuplicatesAndDelays(t *testing.T) {
 	}
 }
 
+// Regression: a slice costing more than one 100 ms refill used to spin
+// forever (the wait loop re-subtracted its cost while refills overwrote the
+// balance), stalling the simulator at the first rate-limited slice.
+func TestRunner_RateLimitSustainsTarget(t *testing.T) {
+	w := world(t, 2000)
+	cfg := DefaultRunnerConfig()
+	cfg.Interval = 100 * time.Millisecond // ~12K ev/s uncapped
+	cfg.Workers = 1                       // 200 events per slice > 100-token refill, as in production
+	cfg.DupRate, cfg.OutOfOrder, cfg.BadRate = 0, 0, 0
+	cfg.RateLimitEPS = 1000
+	pub := &capturePub{reg: oem.DefaultRegistry(), seen: map[string]int{}}
+	r := NewRunner(w, cfg, pub, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_ = r.Run(ctx)
+	got := float64(r.Stats.Events.Load()) / 2
+	if got < 1000*0.6 || got > 1000*1.5 {
+		t.Fatalf("rate-limited throughput %.0f ev/s, want ~1000", got)
+	}
+}
+
 func TestInWindow(t *testing.T) {
 	s := time.Unix(0, 0)
 	if !inWindow(s, s.Add(30*time.Second), time.Minute, 40*time.Second) || inWindow(s, s.Add(10*time.Second), time.Minute, 40*time.Second) {

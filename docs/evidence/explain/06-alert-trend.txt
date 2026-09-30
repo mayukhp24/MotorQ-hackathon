@@ -1,0 +1,42 @@
+# Alert trend (14 days by severity): aggregate over alerts vs mv_alert_daily
+==================== BEFORE ====================
+                                                                                    QUERY PLAN                                                                                    
+----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort (actual time=995.713..995.718 rows=52 loops=1)
+   Sort Key: (((ts AT TIME ZONE 'UTC'::text))::date)
+   Sort Method: quicksort  Memory: 27kB
+   Buffers: shared hit=179001 read=1662
+   ->  HashAggregate (actual time=994.206..995.628 rows=52 loops=1)
+         Group Key: ((ts AT TIME ZONE 'UTC'::text))::date, severity
+         Batches: 1  Memory Usage: 6169kB
+         Buffers: shared hit=178998 read=1662
+         ->  Result (actual time=0.313..932.083 rows=179014 loops=1)
+               One-Time Filter: ((NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid)
+               Buffers: shared hit=178998 read=1662
+               ->  Index Scan using alert_tenant_ts on alert (actual time=0.300..832.166 rows=179014 loops=1)
+                     Index Cond: ((tenant_id = '5119df4b-7356-5c21-8e7b-20e0ccaa3bf6'::uuid) AND (ts >= (now() - '14 days'::interval)) AND (ts < date_trunc('day'::text, now())))
+                     Buffers: shared hit=178998 read=1662
+ Planning:
+   Buffers: shared hit=215
+ Planning Time: 0.721 ms
+ Execution Time: 1001.142 ms
+(18 rows)
+
+==================== AFTER ====================
+                                                                    QUERY PLAN                                                                     
+---------------------------------------------------------------------------------------------------------------------------------------------------
+ Sort (actual time=0.238..0.243 rows=56 loops=1)
+   Sort Key: alert_daily.day
+   Sort Method: quicksort  Memory: 27kB
+   Buffers: shared hit=47
+   ->  Subquery Scan on alert_daily (actual time=0.118..0.172 rows=56 loops=1)
+         Buffers: shared hit=44
+         ->  Index Scan using mv_alert_daily_pk on mv_alert_daily (actual time=0.117..0.163 rows=56 loops=1)
+               Index Cond: ((tenant_id = (NULLIF(current_setting('app.tenant_id'::text, true), ''::text))::uuid) AND (day >= (CURRENT_DATE - 14)))
+               Buffers: shared hit=44
+ Planning:
+   Buffers: shared hit=146
+ Planning Time: 0.921 ms
+ Execution Time: 0.475 ms
+(13 rows)
+

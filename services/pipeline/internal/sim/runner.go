@@ -104,15 +104,27 @@ func (r *Runner) Run(ctx context.Context) error {
 	defer cancel()
 	var wg sync.WaitGroup
 	shards := r.Cfg.Workers
-	var limiter <-chan time.Time
+	// Token bucket with debt: a worker takes its whole slice's cost at once
+	// (which may exceed one refill) and waits until the refills have paid the
+	// debt back; the balance is capped at one second of burst.
 	var tokens atomic.Int64
-	if r.Cfg.RateLimitEPS > 0 {
+	if eps := int64(r.Cfg.RateLimitEPS); eps > 0 {
+		tokens.Store(eps / 10)
 		t := time.NewTicker(100 * time.Millisecond)
 		defer t.Stop()
-		limiter = t.C
 		go func() {
-			for range limiter {
-				tokens.Store(int64(r.Cfg.RateLimitEPS / 10))
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case <-t.C:
+					for {
+						cur := tokens.Load()
+						if tokens.CompareAndSwap(cur, min(cur+eps/10, eps)) {
+							break
+						}
+					}
+				}
 			}
 		}()
 	}
@@ -248,7 +260,8 @@ func (r *Runner) worker(ctx context.Context, cancel context.CancelFunc, shard, s
 			cancel()
 		}
 		if r.Cfg.RateLimitEPS > 0 {
-			for tokens.Add(-int64(len(lives)/slices*factor)) < 0 && ctx.Err() == nil {
+			tokens.Add(-int64(len(lives) / slices * factor))
+			for tokens.Load() < 0 && ctx.Err() == nil {
 				time.Sleep(5 * time.Millisecond)
 			}
 		}
