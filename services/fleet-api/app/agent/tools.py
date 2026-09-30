@@ -139,6 +139,15 @@ async def _propose_work_order(tc: ToolContext, a: dict[str, Any]) -> dict[str, A
     async with db.tenant_tx(tc.principal.tenant_id, readonly=False) as conn:
         if not await conn.fetchval("SELECT 1 FROM vehicle WHERE vin = $1", vin):
             return {"error": f"vehicle {vin} not found in your fleet"}
+        # One pending proposal per vehicle: repeated asks return the existing one
+        # (the advisory lock serialises concurrent requests for the same VIN).
+        await conn.execute("SELECT pg_advisory_xact_lock(hashtext('agent_action:' || $1))", vin)
+        existing = await conn.fetchval(
+            """SELECT action_id FROM agent_action WHERE status = 'PROPOSED' AND tool = 'create_work_order'
+               AND arguments->>'vin' = $1 ORDER BY created_at LIMIT 1""", vin)
+        if existing:
+            return {"status": "ALREADY_PROPOSED", "action_id": str(existing),
+                    "note": "A proposal for this vehicle is already awaiting approval."}
         action_id = await conn.fetchval(
             """INSERT INTO agent_action (tenant_id, user_id, conversation_id, tool, arguments, rationale)
                VALUES ($1, $2, $3, 'create_work_order', $4, $5) RETURNING action_id""",

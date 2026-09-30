@@ -317,6 +317,23 @@ def test_copilot_offline_guardrail_and_approval(env):
     assert c.post(f"/api/v1/copilot/actions/{action_id}/approve", headers=h).status_code == 409
 
 
+def test_copilot_offline_acts_on_riskiest_without_open_order(env):
+    c = env["client"]
+    h = login(c, "maintenance_manager@tenant-a.test")
+    ranked = c.get("/api/v1/maintenance/risk?min_risk=0.3&limit=20", headers=h).json()["items"]
+    expected = next(v["vin"] for v in ranked if not v["has_open_work_order"])
+    t = c.post("/api/v1/copilot/chat", headers=h, json={"message": "Schedule a repair for the riskiest one"}).json()
+    tools = [x["tool"] for x in t["tool_calls"]]
+    assert tools == ["list_at_risk_vehicles", "propose_work_order"], tools
+    assert t["proposed_actions"][0]["vin"] == expected
+    assert "proposed a work order" in t["answer"]
+    again = c.post("/api/v1/copilot/chat", headers=h, json={"message": "Schedule a repair for the riskiest one"}).json()
+    assert again["proposed_actions"][0]["action_id"] == t["proposed_actions"][0]["action_id"]  # no duplicate
+    assert "already awaiting approval" in again["answer"]
+    pending = c.get("/api/v1/copilot/actions", headers=h).json()["items"]
+    assert sum(1 for a in pending if a["arguments"]["vin"] == expected and a["status"] == "PROPOSED") == 1
+
+
 def test_erasure_flow_and_audit_chain(env):
     c = env["client"]
     h = login(c, "fleet_admin@tenant-a.test")

@@ -217,12 +217,18 @@ class Copilot:
             if any(w in m for w in words):
                 comp = c
         plan: list[tuple[str, dict[str, Any]]] = []
+        act_on_riskiest = False
         if vin_match and any(w in m for w in ("work order", "schedule", "book", "fix", "repair it", "create")):
             plan.append(("propose_work_order", {"vin": vin_match.group(0), "component": comp if comp != "any" else "any",
                                                 "priority": "P1" if "urgent" in m else "P2",
                                                 "reason": f"Requested via copilot: {message[:200]}"}))
         elif vin_match:
             plan.append(("get_vehicle_health", {"vin": vin_match.group(0)}))
+        elif any(w in m for w in ("work order", "schedule", "book")) and \
+                any(w in m for w in ("riskiest", "highest risk", "most at risk", "most likely", "worst", "top")):
+            # No conversation memory offline: resolve "the riskiest one" by ranking first.
+            plan.append(("list_at_risk_vehicles", {"min_risk": 0.3, "component": comp, "limit": 20}))
+            act_on_riskiest = True
         elif re.search(r"\b[pcbu][0-3][0-9a-f]{3}\b", m) or any(w in m for w in ("what does", "how to fix", "repair", "cause")):
             plan.append(("search_fault_knowledge", {"query": message, "k": 3}))
         elif any(w in m for w in ("idle", "idling", "fuel waste", "wasting")):
@@ -238,6 +244,15 @@ class Copilot:
             plan.append(("get_fleet_summary", {}))
         calls = [(f"offline-{i}", n, a) for i, (n, a) in enumerate(plan)]
         await self._exec_tools(tc, calls, out)
+        if act_on_riskiest:
+            ranked = out.tool_calls[0]["result"].get("vehicles", [])
+            target = next((v for v in ranked if not v.get("has_open_work_order")), None)
+            if target:
+                await self._exec_tools(tc, [("offline-act", "propose_work_order", {
+                    "vin": target["vin"], "component": target["component"] or "any",
+                    "priority": "P1" if target["risk_7d"] >= 0.5 else "P2",
+                    "reason": f"Highest 7-day breakdown risk without an open work order "
+                              f"({target['risk_7d']:.0%}, {target['component']})"})], out)
         # Follow-up: explain the vehicle's latest fault code from the knowledge base.
         if plan[0][0] == "get_vehicle_health":
             res = out.tool_calls[0]["result"]
@@ -323,7 +338,12 @@ def render_offline(calls: list[dict[str, Any]]) -> str:
             lines += [f"- {a['severity']} {a['type']} on `{a['vin']}` ({a['plate']}): {a['title']} – {a['status']}"
                       for a in r["alerts"]]
         elif tool == "propose_work_order":
-            lines.append(f"I've proposed a work order (action `{r['action_id']}`). {r['note']}")
+            vin = c.get("args", {}).get("vin")
+            target = f" for `{vin}`" if vin else ""
+            if r.get("status") == "ALREADY_PROPOSED":
+                lines += ["", f"A work order{target} is already awaiting approval (action `{r['action_id']}`)."]
+            else:
+                lines += ["", f"I've proposed a work order{target} (action `{r['action_id']}`). {r['note']}"]
     return "\n".join(lines) if lines else "I couldn't find anything relevant."
 
 

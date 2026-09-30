@@ -32,10 +32,13 @@ spec:
           volumeMounts:
             - {name: tmp, mountPath: /tmp}
             - {name: nginx-cache, mountPath: /var/cache/nginx}
+            - {name: nginx-conf, mountPath: /etc/nginx/conf.d}   # rendered from the template at start-up
       volumes:
         {{- include "fp.tmpVolume" . | nindent 8 }}
         - name: nginx-cache
           emptyDir: {sizeLimit: 64Mi}
+        - name: nginx-conf
+          emptyDir: {sizeLimit: 1Mi}
 ---
 apiVersion: v1
 kind: Service

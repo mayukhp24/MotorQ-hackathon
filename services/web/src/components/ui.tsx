@@ -2,8 +2,9 @@ import clsx from "clsx";
 import { AlertOctagon, AlertTriangle, CircleDot, Info, Loader2, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
-export function Card({ title, subtitle, action, children, className, pad = true }: {
-  title?: ReactNode; subtitle?: ReactNode; action?: ReactNode; children: ReactNode; className?: string; pad?: boolean;
+export function Card({ title, subtitle, action, children, className, bodyClassName, pad = true }: {
+  title?: ReactNode; subtitle?: ReactNode; action?: ReactNode; children: ReactNode; className?: string;
+  bodyClassName?: string; pad?: boolean;
 }) {
   return (
     <section className={clsx("card", className)}>
@@ -16,7 +17,7 @@ export function Card({ title, subtitle, action, children, className, pad = true 
           {action && <div className="shrink-0">{action}</div>}
         </header>
       )}
-      <div className={clsx(pad && "card-pad", title && pad && "pt-3")}>{children}</div>
+      <div className={clsx(pad && "card-pad", title && pad && "pt-3", bodyClassName)}>{children}</div>
     </section>
   );
 }

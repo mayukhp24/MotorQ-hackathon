@@ -11,10 +11,12 @@ COPY . .
 RUN npm run build
 
 FROM nginx:1.27-alpine
-COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY nginx.conf /etc/nginx/templates/default.conf.template
 COPY security-headers.conf /etc/nginx/snippets/security-headers.conf
 COPY --from=build /src/dist /usr/share/nginx/html
-RUN chown -R nginx:nginx /var/cache/nginx /usr/share/nginx/html && \
+ENV NGINX_ENTRYPOINT_LOCAL_RESOLVERS=1
+RUN rm -f /etc/nginx/conf.d/default.conf && \
+    chown -R nginx:nginx /var/cache/nginx /usr/share/nginx/html /etc/nginx/conf.d && \
     sed -i 's/^user .*;//' /etc/nginx/nginx.conf && \
     sed -i 's#pid .*;#pid /tmp/nginx.pid;#' /etc/nginx/nginx.conf && touch /tmp/nginx.pid && chown nginx /tmp/nginx.pid
 USER nginx

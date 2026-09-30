@@ -39,7 +39,7 @@ export default function Copilot() {
       if (t.proposed_actions.length) qc.invalidateQueries({ queryKey: ["actions"] });
     },
   });
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth" }), [msgs, chat.isPending]);
+  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), [msgs, chat.isPending]);
 
   function send(text: string) {
     if (!text.trim() || chat.isPending) return;
@@ -52,8 +52,8 @@ export default function Copilot() {
     <>
       <PageHeader title="Maintenance copilot" subtitle="Ask about your fleet in plain language. Answers come only from your organisation's data; every tool call is audited and actions need approval." />
       <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
-        <Card pad={false} className="flex h-[calc(100vh-220px)] min-h-[480px] flex-col">
-          <div className="flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
+        <Card pad={false} className="flex h-[calc(100vh-220px)] min-h-[480px] flex-col" bodyClassName="flex min-h-0 flex-1 flex-col">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
             {msgs.length === 0 && (
               <div className="mx-auto max-w-xl pt-8 text-center">
                 <Bot className="mx-auto h-8 w-8 text-accent" />
