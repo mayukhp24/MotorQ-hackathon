@@ -333,7 +333,7 @@ func TestRunner_DeliversWithDuplicatesAndDelays(t *testing.T) {
 
 func TestInWindow(t *testing.T) {
 	s := time.Unix(0, 0)
-	if !inWindow(s, s.Add(30*time.Second), time.Minute, 40*time.Second) || inWindow(s, s.Add(50*time.Second), time.Minute, 40*time.Second) {
+	if !inWindow(s, s.Add(30*time.Second), time.Minute, 40*time.Second) || inWindow(s, s.Add(10*time.Second), time.Minute, 40*time.Second) {
 		t.Fatal("window math wrong")
 	}
 	if inWindow(s, s, 0, time.Second) {

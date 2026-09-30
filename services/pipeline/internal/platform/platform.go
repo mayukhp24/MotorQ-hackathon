@@ -129,9 +129,6 @@ func NewKafka(extra ...kgo.Opt) (*kgo.Client, error) {
 		kgo.ProducerLinger(time.Duration(EnvInt("KAFKA_LINGER_MS", 5)) * time.Millisecond),
 		kgo.ProducerBatchMaxBytes(1 << 20),
 		kgo.MaxBufferedRecords(EnvInt("KAFKA_MAX_BUFFERED", 200_000)),
-		// Idempotent producers keep per-partition ordering with up to 5
-		// in-flight requests; the default of 1 caps throughput at one RTT.
-		kgo.MaxProduceRequestsInflightPerBroker(EnvInt("KAFKA_MAX_INFLIGHT", 5)),
 		kgo.RecordDeliveryTimeout(2 * time.Minute),
 		kgo.ClientID(Env("SERVICE_NAME", "fleetpulse")),
 	}

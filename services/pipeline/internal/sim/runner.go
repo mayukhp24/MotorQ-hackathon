@@ -88,12 +88,13 @@ func (b *batcher) take() []byte {
 	return cp
 }
 
-// inBurst reports whether t falls inside a periodic window.
+// inWindow reports whether t falls in the last `dur` of each `every`
+// period since start (so a fresh start begins at the normal rate).
 func inWindow(start time.Time, t time.Time, every, dur time.Duration) bool {
 	if every <= 0 || dur <= 0 {
 		return false
 	}
-	return t.Sub(start)%every < dur
+	return t.Sub(start)%every >= every-dur
 }
 
 // Run streams telemetry until ctx is cancelled or Limit is reached.
