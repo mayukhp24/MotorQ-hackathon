@@ -1,0 +1,38 @@
+# Build output
+bin/
+dist/
+build/
+*.exe
+coverage.out
+coverage.html
+*.coverprofile
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Node
+node_modules/
+services/web/dist/
+
+# Env / secrets
+.env
+*.pem
+*.key
+!deploy/**/*.example.key
+
+# Local artefacts
+services/analytics/artifacts/*.joblib
+reports/tmp/
+.DS_Store
+.idea/
+.vscode/
+services/pipeline/vendor/

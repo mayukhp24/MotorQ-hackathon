@@ -1,0 +1,22 @@
+<!-- Hot/warm/cold tiering. Locally "cold" is a second disk path; in the
+     cloud it is an S3/GCS object-storage disk (see deploy/helm values). -->
+<clickhouse>
+    <storage_configuration>
+        <disks>
+            <cold>
+                <type>local</type>
+                <path>/var/lib/clickhouse/cold/</path>
+            </cold>
+        </disks>
+        <policies>
+            <hot_cold>
+                <volumes>
+                    <hot><disk>default</disk></hot>
+                    <cold><disk>cold</disk></cold>
+                </volumes>
+                <move_factor>0.1</move_factor>
+            </hot_cold>
+        </policies>
+    </storage_configuration>
+    <custom_settings_prefixes>SQL_</custom_settings_prefixes>
+</clickhouse>

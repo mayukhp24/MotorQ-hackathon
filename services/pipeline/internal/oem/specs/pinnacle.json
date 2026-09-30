@@ -1,0 +1,29 @@
+{
+  "oem": "pinnacle",
+  "version": 1,
+  "records_path": "data",
+  "fields": {
+    "vin":             {"path": "VIN", "type": "string"},
+    "ts":              {"path": "EventTime", "type": "iso8601"},
+    "seq":             {"path": "Seq"},
+    "lat":             {"path": "Lat"},
+    "lon":             {"path": "Lng"},
+    "heading_deg":     {"path": "Hdg", "optional": true},
+    "speed_kmh":       {"path": "SpeedMph", "unit": "mph"},
+    "accel_mps2":      {"path": "AccelG", "unit": "g", "optional": true},
+    "odo_km":          {"path": "OdometerMi", "unit": "mi"},
+    "ignition":        {"path": "Ign", "type": "bool_str", "true_values": ["ON", "RUN"]},
+    "charging":        {"path": "Chg", "type": "bool_str", "true_values": ["Y"], "optional": true},
+    "rpm":             {"path": "RPM", "optional": true},
+    "coolant_c":       {"path": "CoolantF", "unit": "degF", "optional": true},
+    "engine_load_pct": {"path": "LoadPct", "optional": true},
+    "fuel_pct":        {"path": "FuelPct", "optional": true},
+    "soc_pct":         {"path": "SOC", "unit": "fraction", "optional": true},
+    "pack_temp_c":     {"path": "PackTempF", "unit": "degF", "optional": true},
+    "batt_v":          {"path": "BattV", "optional": true},
+    "tyre_min_kpa":    {"path": "TireMinPsi", "unit": "psi", "optional": true},
+    "dtc":             {"path": "DTC", "type": "csv", "optional": true},
+    "evt":             {"path": "Evt", "type": "csv", "optional": true,
+                        "map": {"HB": "HARSH_BRAKE", "HA": "HARSH_ACCEL", "HC": "HARSH_CORNER", "CR": "CRASH"}}
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "oem": "aurora",
+  "version": 1,
+  "records_path": "records",
+  "fields": {
+    "vin":             {"path": "vehicle.vin", "type": "string"},
+    "ts":              {"path": "timestamp", "type": "epoch_ms"},
+    "seq":             {"path": "sequence"},
+    "lat":             {"path": "position.latitude"},
+    "lon":             {"path": "position.longitude"},
+    "heading_deg":     {"path": "position.heading", "optional": true},
+    "speed_kmh":       {"path": "motion.speedKph"},
+    "accel_mps2":      {"path": "motion.accelMps2", "optional": true},
+    "odo_km":          {"path": "powertrain.odometerKm"},
+    "ignition":        {"path": "powertrain.engineOn", "type": "bool"},
+    "rpm":             {"path": "powertrain.rpm", "optional": true},
+    "coolant_c":       {"path": "powertrain.coolantTempC", "optional": true},
+    "engine_load_pct": {"path": "powertrain.engineLoadPct", "optional": true},
+    "fuel_pct":        {"path": "powertrain.fuelLevelPct", "optional": true},
+    "soc_pct":         {"path": "ev.socPct", "optional": true},
+    "pack_temp_c":     {"path": "ev.packTempC", "optional": true},
+    "charging":        {"path": "ev.charging", "type": "bool", "optional": true},
+    "batt_v":          {"path": "electrical.batteryVoltage", "optional": true},
+    "tyre_min_kpa":    {"path": "chassis.tyreMinKpa", "optional": true},
+    "dtc":             {"path": "diagnostics.dtcs", "type": "array", "optional": true},
+    "evt":             {"path": "events", "type": "array", "optional": true}
+  }
+}
