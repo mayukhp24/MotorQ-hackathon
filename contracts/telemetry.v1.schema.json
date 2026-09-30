@@ -1,0 +1,151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fleetpulse.dev/contracts/telemetry.v1.json",
+  "title": "telemetry.v1 \u2013 canonical vehicle telemetry event",
+  "description": "Produced by ingest-gateway to Kafka topic telemetry.v1 (key = VIN). Consumers: stream-processor. Evolution: additive optional fields only; breaking changes create telemetry.v2.",
+  "type": "object",
+  "required": [
+    "event_id",
+    "v",
+    "vin",
+    "oem",
+    "ts_ms",
+    "seq",
+    "lat",
+    "lon",
+    "heading_deg",
+    "speed_kmh",
+    "accel_mps2",
+    "odo_km",
+    "ignition",
+    "charging",
+    "ingest_ms"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "description": "oem:vin:seq \u2013 idempotency key"
+    },
+    "v": {
+      "const": 1
+    },
+    "vin": {
+      "type": "string",
+      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+    },
+    "oem": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ts_ms": {
+      "type": "integer",
+      "description": "vehicle event time, epoch ms"
+    },
+    "seq": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "lat": {
+      "type": "number",
+      "minimum": -90,
+      "maximum": 90
+    },
+    "lon": {
+      "type": "number",
+      "minimum": -180,
+      "maximum": 180
+    },
+    "heading_deg": {
+      "type": "number"
+    },
+    "speed_kmh": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 300
+    },
+    "accel_mps2": {
+      "type": "number"
+    },
+    "odo_km": {
+      "type": "number",
+      "minimum": 0
+    },
+    "ignition": {
+      "type": "boolean"
+    },
+    "charging": {
+      "type": "boolean"
+    },
+    "rpm": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "coolant_c": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "engine_load_pct": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "fuel_pct": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "soc_pct": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "pack_temp_c": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "batt_v": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "tyre_min_kpa": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "dtc": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "pattern": "^[PCBU][0-3][0-9A-F]{3}$"
+      },
+      "maxItems": 32
+    },
+    "evt": {
+      "type": "array",
+      "items": {
+        "enum": [
+          "HARSH_BRAKE",
+          "HARSH_ACCEL",
+          "HARSH_CORNER",
+          "CRASH"
+        ]
+      }
+    },
+    "ingest_ms": {
+      "type": "integer"
+    }
+  },
+  "additionalProperties": false
+}

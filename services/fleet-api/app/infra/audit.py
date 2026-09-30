@@ -9,6 +9,7 @@ each row (tamper evidence). On shutdown the queue is drained.
 from __future__ import annotations
 
 import asyncio
+import ipaddress
 import logging
 from dataclasses import dataclass, field
 from typing import Any
@@ -40,12 +41,24 @@ class AuditEvent:
     details: dict[str, Any] = field(default_factory=dict)
 
 
+def _valid_ip(ev: AuditEvent) -> str | None:
+    """Keep the inet column valid; preserve anything else as a detail."""
+    if not ev.ip:
+        return None
+    try:
+        return str(ipaddress.ip_address(ev.ip))
+    except ValueError:
+        ev.details = {**ev.details, "client": ev.ip}
+        return None
+
+
 class AuditWriter:
     def __init__(self, max_queue: int = 50_000, batch: int = 500, interval_s: float = 0.2) -> None:
         self.q: asyncio.Queue[AuditEvent] = asyncio.Queue(maxsize=max_queue)
         self.batch = batch
         self.interval = interval_s
         self._task: asyncio.Task | None = None
+        self._lock = asyncio.Lock()  # a caller's flush waits for an in-flight batch
 
     def record(self, ev: AuditEvent) -> None:
         try:
@@ -75,19 +88,21 @@ class AuditWriter:
                 log.exception("audit flush failed")
 
     async def flush(self) -> int:
-        items: list[AuditEvent] = []
-        while not self.q.empty() and len(items) < self.batch:
-            items.append(self.q.get_nowait())
-        if not items:
-            return 0
-        # Group by tenant: RLS WITH CHECK requires app.tenant_id to match.
-        by_tenant: dict[str | None, list[AuditEvent]] = {}
-        for ev in items:
-            by_tenant.setdefault(ev.tenant_id, []).append(ev)
-        for tenant, evs in by_tenant.items():
-            async with db.tenant_tx(tenant, readonly=False) as conn:
-                await conn.executemany(_SQL, [
-                    (e.tenant_id, e.actor_id, e.actor_type, e.action, e.resource_type, e.resource_id, e.outcome,
-                     e.ip, e.request_id, e.details) for e in evs])
-        AUDIT_WRITTEN.inc(len(items))
-        return len(items)
+        async with self._lock:
+            total = 0
+            while not self.q.empty():
+                items: list[AuditEvent] = []
+                while not self.q.empty() and len(items) < self.batch:
+                    items.append(self.q.get_nowait())
+                # Group by tenant: RLS WITH CHECK requires app.tenant_id to match.
+                by_tenant: dict[str | None, list[AuditEvent]] = {}
+                for ev in items:
+                    by_tenant.setdefault(ev.tenant_id, []).append(ev)
+                for tenant, evs in by_tenant.items():
+                    async with db.tenant_tx(tenant, readonly=False) as conn:
+                        await conn.executemany(_SQL, [
+                            (e.tenant_id, e.actor_id, e.actor_type, e.action, e.resource_type, e.resource_id,
+                             e.outcome, _valid_ip(e), e.request_id, e.details) for e in evs])
+                AUDIT_WRITTEN.inc(len(items))
+                total += len(items)
+            return total

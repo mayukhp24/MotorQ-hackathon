@@ -32,7 +32,10 @@ class ClickHouse:
             q[f"param_{k}"] = v
 
         async def _do() -> list[dict[str, Any]]:
-            r = await self._client.post("/", params=q, content=sql.encode())
+            try:
+                r = await self._client.post("/", params=q, content=sql.encode())
+            except httpx.HTTPError as e:  # network failures count towards the breaker
+                raise RuntimeError(f"clickhouse unreachable: {type(e).__name__}") from e
             if r.status_code != 200:
                 raise RuntimeError(f"clickhouse {r.status_code}: {r.text[:300]}")
             return [orjson.loads(line) for line in r.content.splitlines() if line.strip()]

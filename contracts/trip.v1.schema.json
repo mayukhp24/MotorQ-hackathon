@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fleetpulse.dev/contracts/trip.v1.json",
+  "title": "trips.v1 \u2013 closed trip summary",
+  "description": "Produced by stream-processor on ignition-off. Consumer: sink-writer.",
+  "type": "object",
+  "required": [
+    "trip_id",
+    "tenant_id",
+    "fleet_id",
+    "vin",
+    "start_ms",
+    "end_ms",
+    "start_lat",
+    "start_lon",
+    "end_lat",
+    "end_lon",
+    "distance_km",
+    "max_speed_kmh",
+    "idle_s",
+    "harsh_brakes",
+    "harsh_accels",
+    "overspeed_s",
+    "energy_used_pct"
+  ],
+  "properties": {
+    "trip_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "tenant_id": {
+      "type": "string"
+    },
+    "fleet_id": {
+      "type": "string"
+    },
+    "vin": {
+      "type": "string",
+      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+    },
+    "driver_id": {
+      "type": "string"
+    },
+    "start_ms": {
+      "type": "integer"
+    },
+    "end_ms": {
+      "type": "integer"
+    },
+    "start_lat": {
+      "type": "number"
+    },
+    "start_lon": {
+      "type": "number"
+    },
+    "end_lat": {
+      "type": "number"
+    },
+    "end_lon": {
+      "type": "number"
+    },
+    "distance_km": {
+      "type": "number",
+      "minimum": 0
+    },
+    "max_speed_kmh": {
+      "type": "number"
+    },
+    "idle_s": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "harsh_brakes": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "harsh_accels": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "overspeed_s": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "energy_used_pct": {
+      "type": "number"
+    }
+  },
+  "additionalProperties": false
+}

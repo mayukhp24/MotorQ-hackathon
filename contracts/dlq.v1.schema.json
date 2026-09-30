@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fleetpulse.dev/contracts/dlq.v1.json",
+  "title": "telemetry.dlq.v1 \u2013 rejected record",
+  "description": "Records that failed normalisation/validation, with the raw payload for replay.",
+  "type": "object",
+  "required": [
+    "oem",
+    "reason",
+    "raw"
+  ],
+  "properties": {
+    "oem": {
+      "type": "string"
+    },
+    "reason": {
+      "type": "string"
+    },
+    "raw": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

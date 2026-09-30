@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://fleetpulse.dev/contracts/alert.v1.json",
+  "title": "alerts.v1 \u2013 real-time alert",
+  "description": "Produced by stream-processor (key = VIN) and Redis channel alerts:{tenant}. Consumers: sink-writer (PostgreSQL), ClickHouse alerts_history, fleet-api WebSocket.",
+  "type": "object",
+  "required": [
+    "alert_id",
+    "tenant_id",
+    "fleet_id",
+    "vin",
+    "type",
+    "severity",
+    "title",
+    "ts_ms",
+    "ingest_ms",
+    "detected_ms",
+    "lat",
+    "lon",
+    "details"
+  ],
+  "properties": {
+    "alert_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "UUIDv5(vin|type|cooldown bucket) \u2013 idempotent"
+    },
+    "tenant_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "fleet_id": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "vin": {
+      "type": "string",
+      "pattern": "^[A-HJ-NPR-Z0-9]{17}$"
+    },
+    "type": {
+      "enum": [
+        "CRITICAL_DTC",
+        "MAJOR_DTC",
+        "ENGINE_OVERHEAT",
+        "COOLANT_HIGH",
+        "LOW_BATTERY_VOLTAGE",
+        "EV_PACK_OVERTEMP",
+        "LOW_STATE_OF_CHARGE",
+        "CRASH_DETECTED",
+        "RISKY_DRIVING",
+        "EXCESSIVE_IDLE",
+        "OVERSPEED",
+        "TYRE_PRESSURE_LOW"
+      ]
+    },
+    "severity": {
+      "enum": [
+        "CRITICAL",
+        "HIGH",
+        "MEDIUM",
+        "LOW"
+      ]
+    },
+    "title": {
+      "type": "string"
+    },
+    "ts_ms": {
+      "type": "integer"
+    },
+    "ingest_ms": {
+      "type": "integer"
+    },
+    "detected_ms": {
+      "type": "integer"
+    },
+    "lat": {
+      "type": "number"
+    },
+    "lon": {
+      "type": "number"
+    },
+    "details": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}
