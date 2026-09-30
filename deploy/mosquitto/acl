@@ -1,0 +1,6 @@
+# Connectors may only publish their telemetry; the gateway may only subscribe.
+user oem-connector
+topic write fleetpulse/oem/+/telemetry
+
+user gateway
+topic read fleetpulse/oem/+/telemetry

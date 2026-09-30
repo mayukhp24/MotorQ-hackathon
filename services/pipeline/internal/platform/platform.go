@@ -18,6 +18,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/twmb/franz-go/pkg/kadm"
+	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
 )
 
@@ -128,6 +129,9 @@ func NewKafka(extra ...kgo.Opt) (*kgo.Client, error) {
 		kgo.ProducerLinger(time.Duration(EnvInt("KAFKA_LINGER_MS", 5)) * time.Millisecond),
 		kgo.ProducerBatchMaxBytes(1 << 20),
 		kgo.MaxBufferedRecords(EnvInt("KAFKA_MAX_BUFFERED", 200_000)),
+		// Idempotent producers keep per-partition ordering with up to 5
+		// in-flight requests; the default of 1 caps throughput at one RTT.
+		kgo.MaxProduceRequestsInflightPerBroker(EnvInt("KAFKA_MAX_INFLIGHT", 5)),
 		kgo.RecordDeliveryTimeout(2 * time.Minute),
 		kgo.ClientID(Env("SERVICE_NAME", "fleetpulse")),
 	}
@@ -159,12 +163,11 @@ func EnsureTopics(ctx context.Context, cl *kgo.Client, log *slog.Logger) error {
 		lastErr = nil
 		for _, s := range specs {
 			resp, err := adm.CreateTopic(ctx, s.parts, rf, s.cfg, s.name)
-			if err != nil {
-				lastErr = err
-				break
+			if err == nil {
+				err = resp.Err
 			}
-			if resp.Err != nil && !strings.Contains(resp.Err.Error(), "TOPIC_ALREADY_EXISTS") {
-				lastErr = resp.Err
+			if err != nil && !errors.Is(err, kerr.TopicAlreadyExists) {
+				lastErr = err
 				break
 			}
 		}

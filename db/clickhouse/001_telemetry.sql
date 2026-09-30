@@ -2,7 +2,7 @@
 -- Telemetry is consumed straight from Kafka (no custom sink code), stored
 -- column-compressed, partitioned by day and ordered by (tenant, vin, ts) so
 -- per-vehicle history is a narrow range scan and fleet-wide scans prune by
--- day. ${VARS} are substituted by the migrator from the environment.
+-- day. Dollar-brace placeholders are substituted by the migrator from env.
 
 CREATE DATABASE IF NOT EXISTS fleet;
 

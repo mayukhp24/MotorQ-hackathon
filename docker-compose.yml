@@ -1,0 +1,287 @@
+# FleetPulse – one-command local stack:  docker compose up -d
+# Every secret has a local-only default so the stack starts without setup;
+# copy .env.example to .env to override. Never use these defaults outside a laptop.
+
+x-pipeline: &pipeline
+  image: fleetpulse/pipeline:${IMAGE_TAG:-dev}
+  build:
+    context: .
+    dockerfile: services/pipeline/Dockerfile
+  restart: unless-stopped
+  environment: &pipeline-env
+    KAFKA_BROKERS: kafka:9092
+    TELEMETRY_PARTITIONS: ${TELEMETRY_PARTITIONS:-12}
+    DATABASE_URL: postgres://fleetpulse_writer:${DB_WRITER_PASSWORD:-writer-local-only}@postgres:5432/fleetpulse
+    REDIS_URL: redis://:${REDIS_PASSWORD:-redis-local-only}@redis:6379/0
+    LOG_LEVEL: ${LOG_LEVEL:-info}
+
+services:
+  # ------------------------------------------------------------ infrastructure
+  kafka:
+    image: apache/kafka:3.8.0
+    restart: unless-stopped
+    ports: ["29092:29092"]
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093,EXTERNAL://:29092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+      KAFKA_NUM_NETWORK_THREADS: 6
+      KAFKA_NUM_IO_THREADS: 8
+      KAFKA_LOG_RETENTION_HOURS: 24
+      KAFKA_HEAP_OPTS: -Xms1g -Xmx1g
+    volumes: [kafka-data:/var/lib/kafka/data]
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:9092 >/dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    ports: ["5432:5432"]
+    environment:
+      POSTGRES_DB: fleetpulse
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres-local-only}
+    command: >
+      postgres -c shared_buffers=1GB -c work_mem=32MB -c maintenance_work_mem=512MB
+      -c max_connections=300 -c effective_cache_size=3GB -c random_page_cost=1.1
+      -c max_wal_size=4GB -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all -c log_min_duration_statement=500
+    volumes: [pg-data:/var/lib/postgresql/data]
+    shm_size: 1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d fleetpulse"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports: ["6379:6379"]
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-redis-local-only}", "--save", "", "--appendonly", "no",
+              "--maxmemory", "2gb", "--maxmemory-policy", "volatile-lru", "--io-threads", "2"]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"$${REDIS_PASSWORD:-redis-local-only}\" --no-auth-warning ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis-local-only}
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    restart: unless-stopped
+    ports: ["8123:8123"]
+    environment:
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse-local-only}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    volumes:
+      - ch-data:/var/lib/clickhouse
+      - ./deploy/clickhouse/storage.xml:/etc/clickhouse-server/config.d/storage.xml:ro
+    ulimits:
+      nofile: {soft: 262144, hard: 262144}
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping | grep Ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    restart: unless-stopped
+    ports: ["1883:1883"]
+    entrypoint: ["/bin/sh", "/mosquitto/config/entrypoint.sh"]
+    environment:
+      MQTT_GATEWAY_PASSWORD: ${MQTT_GATEWAY_PASSWORD:-gateway-local-only}
+      MQTT_CONNECTOR_PASSWORD: ${MQTT_CONNECTOR_PASSWORD:-connector-local-only}
+    volumes:
+      - ./deploy/mosquitto:/mosquitto/config:ro
+
+  # ------------------------------------------------------------ one-shot jobs
+  migrate:
+    <<: *pipeline
+    restart: "no"
+    entrypoint: ["/usr/local/bin/migrate"]
+    environment:
+      MIGRATE_DATABASE_URL: postgres://postgres:${POSTGRES_PASSWORD:-postgres-local-only}@postgres:5432/fleetpulse
+      DB_API_PASSWORD: ${DB_API_PASSWORD:-api-local-only}
+      DB_WRITER_PASSWORD: ${DB_WRITER_PASSWORD:-writer-local-only}
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse-local-only}
+      CLICKHOUSE_RO_PASSWORD: ${CLICKHOUSE_RO_PASSWORD:-clickhouse-ro-local-only}
+      KAFKA_BROKERS: kafka:9092
+      CH_KAFKA_CONSUMERS: ${CH_KAFKA_CONSUMERS:-4}
+    depends_on:
+      postgres: {condition: service_healthy}
+      clickhouse: {condition: service_healthy}
+      kafka: {condition: service_healthy}
+
+  seed:
+    <<: *pipeline
+    restart: "no"
+    entrypoint: ["/usr/local/bin/simulator", "seed"]
+    environment:
+      <<: *pipeline-env
+      SIM_VEHICLES: ${SIM_VEHICLES:-100000}
+      SEED_HISTORY_DAYS: ${SEED_HISTORY_DAYS:-60}
+      SEED_DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-FleetPulse!2026}
+      PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:-local-dev-pii-key-change-me}
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse-local-only}
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  # ------------------------------------------------------------ data pipeline
+  ingest-gateway:
+    <<: *pipeline
+    entrypoint: ["/usr/local/bin/ingest-gateway"]
+    ports: ["8080:8080"]
+    environment:
+      <<: *pipeline-env
+      INGEST_API_KEYS: ${INGEST_API_KEYS:-aurora:aurora-local-key,pinnacle:pinnacle-local-key,stellar:stellar-local-key}
+      MQTT_URL: tcp://mosquitto:1883
+      MQTT_USERNAME: gateway
+      MQTT_PASSWORD: ${MQTT_GATEWAY_PASSWORD:-gateway-local-only}
+      SERVICE_NAME: ingest-gateway
+    depends_on:
+      kafka: {condition: service_healthy}
+      mosquitto: {condition: service_started}
+
+  stream-processor:
+    <<: *pipeline
+    entrypoint: ["/usr/local/bin/stream-processor"]
+    environment:
+      <<: *pipeline-env
+      SERVICE_NAME: stream-processor
+    deploy:
+      replicas: ${PROCESSOR_REPLICAS:-2}
+    depends_on:
+      seed: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+
+  sink-writer:
+    <<: *pipeline
+    entrypoint: ["/usr/local/bin/sink-writer"]
+    environment:
+      <<: *pipeline-env
+      SERVICE_NAME: sink-writer
+    depends_on:
+      seed: {condition: service_completed_successfully}
+
+  simulator:
+    <<: *pipeline
+    entrypoint: ["/usr/local/bin/simulator", "stream"]
+    environment:
+      SIM_VEHICLES: ${SIM_VEHICLES:-100000}
+      SIM_INTERVAL: ${SIM_INTERVAL:-5s}
+      SIM_TRANSPORT: ${SIM_TRANSPORT:-mqtt}
+      MQTT_URL: tcp://mosquitto:1883
+      MQTT_USERNAME: oem-connector
+      MQTT_PASSWORD: ${MQTT_CONNECTOR_PASSWORD:-connector-local-only}
+      INGEST_URL: http://ingest-gateway:8080
+      INGEST_API_KEYS: ${INGEST_API_KEYS:-aurora:aurora-local-key,pinnacle:pinnacle-local-key,stellar:stellar-local-key}
+      SIM_BURST_EVERY: ${SIM_BURST_EVERY:-30m}
+      SIM_BURST_FOR: ${SIM_BURST_FOR:-5m}
+      SIM_OUTAGE_EVERY: ${SIM_OUTAGE_EVERY:-10m}
+      SIM_OUTAGE_FOR: ${SIM_OUTAGE_FOR:-20s}
+      SIM_MAX_EPS: ${SIM_MAX_EPS:-0}
+    depends_on:
+      ingest-gateway: {condition: service_started}
+      stream-processor: {condition: service_started}
+
+  # ------------------------------------------------------------ application
+  fleet-api:
+    image: fleetpulse/fleet-api:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: services/fleet-api/Dockerfile
+    restart: unless-stopped
+    ports: ["8000:8000"]
+    environment:
+      DATABASE_URL: postgresql://fleetpulse_api:${DB_API_PASSWORD:-api-local-only}@postgres:5432/fleetpulse
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis-local-only}@redis:6379/1
+      LIVE_REDIS_URL: redis://:${REDIS_PASSWORD:-redis-local-only}@redis:6379/0
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: fleetpulse_ro
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_RO_PASSWORD:-clickhouse-ro-local-only}
+      PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:-local-dev-pii-key-change-me}
+      JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      LLM_MODEL: ${LLM_MODEL:-claude-sonnet-5-5}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
+      WEB_CONCURRENCY: ${API_WORKERS:-4}
+    depends_on:
+      seed: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+
+  analytics:
+    image: fleetpulse/analytics:${IMAGE_TAG:-dev}
+    build:
+      context: .
+      dockerfile: services/analytics/Dockerfile
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://fleetpulse_writer:${DB_WRITER_PASSWORD:-writer-local-only}@postgres:5432/fleetpulse
+      CLICKHOUSE_URL: http://clickhouse:8123
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-clickhouse-local-only}
+      SCHEDULE: ${ANALYTICS_SCHEDULE:-daily}
+    volumes: [model-artifacts:/app/artifacts]
+    depends_on:
+      seed: {condition: service_completed_successfully}
+
+  web:
+    image: fleetpulse/web:${IMAGE_TAG:-dev}
+    build:
+      context: services/web
+    restart: unless-stopped
+    ports: ["3000:8080"]
+    depends_on: [fleet-api]
+
+  # ------------------------------------------------------------ observability
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    restart: unless-stopped
+    ports: ["9090:9090"]
+    command: ["--config.file=/etc/prometheus/prometheus.yml", "--storage.tsdb.retention.time=7d", "--web.enable-lifecycle"]
+    volumes:
+      - ./deploy/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+
+  kafka-exporter:
+    image: danielqsj/kafka-exporter:v1.8.0
+    restart: unless-stopped
+    command: ["--kafka.server=kafka:9092"]
+    depends_on:
+      kafka: {condition: service_healthy}
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    restart: unless-stopped
+    ports: ["3001:3000"]
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-grafana-local-only}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+    volumes:
+      - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./deploy/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+
+volumes:
+  kafka-data:
+  pg-data:
+  ch-data:
+  model-artifacts:
