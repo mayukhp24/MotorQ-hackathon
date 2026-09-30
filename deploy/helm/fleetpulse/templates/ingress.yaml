@@ -1,0 +1,45 @@
+{{- if .Values.ingress.enabled }}
+{{- $i := .Values.ingress -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fleetpulse
+  labels:
+    {{- include "fp.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml $i.annotations | nindent 4 }}
+spec:
+  ingressClassName: {{ $i.className }}
+  tls:
+    - hosts: [{{ $i.host | quote }}]
+      secretName: {{ $i.tlsSecret }}
+  rules:
+    - host: {{ $i.host | quote }}
+      http:
+        paths:
+          - {path: /api, pathType: Prefix, backend: {service: {name: fleet-api, port: {name: http}}}}
+          - {path: /.well-known, pathType: Prefix, backend: {service: {name: fleet-api, port: {name: http}}}}
+          - {path: /, pathType: Prefix, backend: {service: {name: web, port: {name: http}}}}
+{{- if $i.ingestHost }}
+---
+# OEM cloud push endpoint: separate host, client-certificate verification.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: fleetpulse-ingest
+  labels:
+    {{- include "fp.labels" . | nindent 4 }}
+  annotations:
+    {{- toYaml (merge (dict) $i.ingestAnnotations (omit $i.annotations "nginx.ingress.kubernetes.io/proxy-read-timeout")) | nindent 4 }}
+spec:
+  ingressClassName: {{ $i.className }}
+  tls:
+    - hosts: [{{ $i.ingestHost | quote }}]
+      secretName: {{ printf "%s-ingest" $i.tlsSecret }}
+  rules:
+    - host: {{ $i.ingestHost | quote }}
+      http:
+        paths:
+          - {path: /v1, pathType: Prefix, backend: {service: {name: ingest-gateway, port: {name: http}}}}
+{{- end }}
+{{- end }}

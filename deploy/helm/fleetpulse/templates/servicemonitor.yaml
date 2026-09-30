@@ -1,0 +1,15 @@
+{{- if .Values.serviceMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: fleetpulse
+  labels:
+    {{- include "fp.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  podMetricsEndpoints:
+    - {port: ops, path: /metrics, interval: 15s}
+    - {port: http, path: /metrics, interval: 15s}
+{{- end }}

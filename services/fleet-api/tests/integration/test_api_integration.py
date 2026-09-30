@@ -52,8 +52,6 @@ VIN_A = _fix_vins()
 
 
 def seed(conn, key_pem_env):
-    import psycopg2.extras
-
     cur = conn.cursor()
     for f in sorted((REPO / "db" / "postgres" / "migrations").glob("*.sql")):
         cur.execute(f.read_text())

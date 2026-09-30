@@ -1,12 +1,13 @@
 # Build context: repository root (the image also carries db/ migrations).
 # Optional build secret `extra_ca` adds a corporate TLS-inspection CA for the
-# build stage only; it never reaches the final image.
+# dependency download only; it is never written to any layer.
 FROM golang:1.26-alpine AS build
 WORKDIR /src
-RUN --mount=type=secret,id=extra_ca,required=false \
-    if [ -s /run/secrets/extra_ca ]; then cat /run/secrets/extra_ca >> /etc/ssl/certs/ca-certificates.crt; fi
 COPY services/pipeline/go.mod services/pipeline/go.sum ./
-RUN --mount=type=cache,target=/root/go/pkg/mod go mod download
+RUN --mount=type=cache,target=/root/go/pkg/mod --mount=type=secret,id=extra_ca,required=false \
+    if [ -s /run/secrets/extra_ca ]; then cat /etc/ssl/certs/ca-certificates.crt /run/secrets/extra_ca > /tmp/ca.pem; \
+      export SSL_CERT_FILE=/tmp/ca.pem; fi; \
+    go mod download && rm -f /tmp/ca.pem
 COPY services/pipeline/ ./
 RUN --mount=type=cache,target=/root/go/pkg/mod --mount=type=cache,target=/root/.cache/go-build \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w" -o /out/ ./cmd/...

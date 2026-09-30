@@ -1,0 +1,161 @@
+# Cloud-agnostic defaults. Managed data services (PostgreSQL, Redis, Kafka,
+# ClickHouse, MQTT) are external and referenced by endpoint; credentials come
+# from a Kubernetes Secret that External Secrets Operator syncs from the
+# cloud secret manager (see values-aws.yaml / values-gcp.yaml).
+
+global:
+  imageRegistry: ghcr.io/your-org
+  imageTag: "1.0.0"
+  imagePullPolicy: IfNotPresent
+  environment: production
+
+# ------------------------------------------------------------------ endpoints
+endpoints:
+  kafkaBrokers: "kafka-0.kafka:9092"
+  kafka:
+    tls: true
+    saslMechanism: SCRAM-SHA-512      # "" to disable
+    partitions: 48                    # telemetry.v1 partitions (processor parallelism ceiling)
+    retentionHours: 72
+  postgres:
+    host: postgres
+    port: 5432
+    database: fleetpulse
+    adminUser: fleetpulse_admin       # migrations only; the app uses least-privilege roles
+    sslmode: verify-full
+    caConfigMap: ""                   # ConfigMap with key ca.pem (provider CA bundle) for verify-full
+  redis:
+    host: redis
+    port: 6379
+    tls: true                         # password from secret
+  clickhouse:
+    url: "https://clickhouse:8443"
+    hotDays: 7
+    retentionDays: 395
+  mqtt:
+    url: "ssl://mqtt:8883"            # devices and OEM clouds connect with mTLS
+    topic: "$share/ingest/fleetpulse/oem/+/telemetry"
+
+# ------------------------------------------------------------------ secrets
+secrets:
+  # Name of the Secret holding every credential below (created by External
+  # Secrets Operator when externalSecrets.enabled, otherwise by you).
+  name: fleetpulse-secrets
+  keys:
+    - DB_API_PASSWORD
+    - DB_WRITER_PASSWORD
+    - DB_MIGRATE_PASSWORD
+    - REDIS_PASSWORD
+    - KAFKA_SASL_USERNAME
+    - KAFKA_SASL_PASSWORD
+    - CLICKHOUSE_PASSWORD
+    - CLICKHOUSE_RO_PASSWORD
+    - PII_ENCRYPTION_KEY
+    - CURSOR_SECRET
+    - JWT_PRIVATE_KEY_PEM
+    - INGEST_API_KEYS
+    - MQTT_GATEWAY_PASSWORD
+    - ANTHROPIC_API_KEY
+
+externalSecrets:
+  enabled: true
+  refreshInterval: 1h
+  secretStoreRef: {kind: ClusterSecretStore, name: cloud-secrets}
+  remoteKeyPrefix: fleetpulse/prod/     # one secret-manager entry per key
+
+# mTLS material for the MQTT subscriber (ca.crt, tls.crt, tls.key), e.g. from cert-manager.
+mqttClientCertSecret: fleetpulse-mqtt-client-tls
+
+# ------------------------------------------------------------------ security
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  seccompProfile: {type: RuntimeDefault}
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities: {drop: [ALL]}
+
+networkPolicy:
+  enabled: true
+  # CIDRs of the managed data services (VPC-private subnets).
+  dataServiceCIDRs: ["10.0.0.0/16"]
+  # Egress for the copilot's LLM API and the cloud secret manager.
+  allowInternetEgressFor: [fleet-api]
+
+serviceAccount:
+  create: true
+  annotations: {}   # e.g. eks.amazonaws.com/role-arn for IRSA (S3 model artefacts)
+
+# ------------------------------------------------------------------ workloads
+ingestGateway:
+  replicas: 3
+  resources: {requests: {cpu: "1", memory: 512Mi}, limits: {cpu: "2", memory: 1Gi}}
+  autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 24, targetCPU: 65}
+  maxInflight: 256
+  service: {type: ClusterIP, port: 8080}
+
+streamProcessor:
+  replicas: 6
+  resources: {requests: {cpu: "2", memory: 2Gi}, limits: {cpu: "3", memory: 3Gi}}
+  # Scale on consumer lag with KEDA when installed; CPU HPA otherwise.
+  keda: {enabled: false, lagThreshold: "50000", minReplicas: 6, maxReplicas: 48}
+  autoscaling: {enabled: true, minReplicas: 6, maxReplicas: 48, targetCPU: 60}
+
+sinkWriter:
+  replicas: 2
+  resources: {requests: {cpu: 250m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+
+fleetApi:
+  replicas: 3
+  workers: 4
+  llmModel: claude-opus-5-5
+  corsOrigins: "https://fleetpulse.example.com"
+  resources: {requests: {cpu: "1", memory: 1Gi}, limits: {cpu: "2", memory: 2Gi}}
+  autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 20, targetCPU: 60}
+  service: {type: ClusterIP, port: 8000}
+
+web:
+  replicas: 2
+  resources: {requests: {cpu: 100m, memory: 64Mi}, limits: {cpu: 500m, memory: 128Mi}}
+
+analytics:
+  resources: {requests: {cpu: "2", memory: 4Gi}, limits: {cpu: "4", memory: 8Gi}}
+  artifacts: {storageClass: "", size: 5Gi}
+  schedules:
+    refresh: "7 * * * *"        # read models, hourly
+    score: "35 0 * * *"         # daily risk scoring
+    train: "20 2 * * 0"         # weekly retrain + evaluation vs baselines
+    kb: "50 1 * * 0"            # weekly knowledge-base re-embedding
+
+migrations:
+  enabled: true                 # pre-install/pre-upgrade hook Job
+
+simulator:
+  enabled: false                # demo environments only
+  vehicles: 100000
+  interval: 1s
+  transport: mqtt
+
+ingress:
+  enabled: true
+  className: nginx
+  host: fleetpulse.example.com
+  tlsSecret: fleetpulse-tls
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/limit-rps: "50"
+  # Separate host for OEM cloud HTTPS push (API-key + client-cert auth).
+  ingestHost: ingest.fleetpulse.example.com
+  ingestAnnotations:
+    nginx.ingress.kubernetes.io/auth-tls-verify-client: "on"
+    nginx.ingress.kubernetes.io/auth-tls-secret: fleetpulse/oem-client-ca
+
+pdb:
+  enabled: true
+
+serviceMonitor:
+  enabled: false                # set true with the Prometheus Operator

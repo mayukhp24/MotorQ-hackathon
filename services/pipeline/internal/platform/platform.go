@@ -5,6 +5,8 @@ package platform
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -20,6 +22,7 @@ import (
 	"github.com/twmb/franz-go/pkg/kadm"
 	"github.com/twmb/franz-go/pkg/kerr"
 	"github.com/twmb/franz-go/pkg/kgo"
+	"github.com/twmb/franz-go/pkg/sasl/scram"
 )
 
 // Env returns the environment variable or a default.
@@ -119,6 +122,62 @@ func Brokers() []string {
 	return strings.Split(Env("KAFKA_BROKERS", "localhost:9092"), ",")
 }
 
+// ClientTLS builds a client TLS configuration from {PREFIX}_TLS=true plus
+// optional PEM files: {PREFIX}_TLS_CA_FILE verifies the server (system roots
+// otherwise) and {PREFIX}_TLS_CERT_FILE/_KEY_FILE present a client
+// certificate for mutual TLS. Returns nil when TLS is disabled.
+func ClientTLS(prefix string) (*tls.Config, error) {
+	if !strings.EqualFold(Env(prefix+"_TLS", "false"), "true") {
+		return nil, nil
+	}
+	cfg := &tls.Config{MinVersion: tls.VersionTLS12}
+	if ca := Env(prefix+"_TLS_CA_FILE", ""); ca != "" {
+		pem, err := os.ReadFile(ca)
+		if err != nil {
+			return nil, fmt.Errorf("%s CA: %w", prefix, err)
+		}
+		pool := x509.NewCertPool()
+		if !pool.AppendCertsFromPEM(pem) {
+			return nil, fmt.Errorf("%s CA: no certificates in %s", prefix, ca)
+		}
+		cfg.RootCAs = pool
+	}
+	cert, key := Env(prefix+"_TLS_CERT_FILE", ""), Env(prefix+"_TLS_KEY_FILE", "")
+	if cert != "" || key != "" {
+		kp, err := tls.LoadX509KeyPair(cert, key)
+		if err != nil {
+			return nil, fmt.Errorf("%s client certificate: %w", prefix, err)
+		}
+		cfg.Certificates = []tls.Certificate{kp}
+	}
+	return cfg, nil
+}
+
+// kafkaSecurity maps KAFKA_TLS* and KAFKA_SASL_* (SCRAM, as used by managed
+// Kafka such as Amazon MSK) to client options.
+func kafkaSecurity() ([]kgo.Opt, error) {
+	var opts []kgo.Opt
+	tlsCfg, err := ClientTLS("KAFKA")
+	if err != nil {
+		return nil, err
+	}
+	if tlsCfg != nil {
+		opts = append(opts, kgo.DialTLSConfig(tlsCfg))
+	}
+	mech := strings.ToUpper(Env("KAFKA_SASL_MECHANISM", ""))
+	auth := scram.Auth{User: Env("KAFKA_SASL_USERNAME", ""), Pass: Env("KAFKA_SASL_PASSWORD", "")}
+	switch mech {
+	case "":
+	case "SCRAM-SHA-512":
+		opts = append(opts, kgo.SASL(auth.AsSha512Mechanism()))
+	case "SCRAM-SHA-256":
+		opts = append(opts, kgo.SASL(auth.AsSha256Mechanism()))
+	default:
+		return nil, fmt.Errorf("unsupported KAFKA_SASL_MECHANISM %q", mech)
+	}
+	return opts, nil
+}
+
 // NewKafka builds a franz-go client with production defaults: idempotent
 // producer, acks=all, lz4 compression, bounded buffering for back-pressure.
 func NewKafka(extra ...kgo.Opt) (*kgo.Client, error) {
@@ -132,6 +191,11 @@ func NewKafka(extra ...kgo.Opt) (*kgo.Client, error) {
 		kgo.RecordDeliveryTimeout(2 * time.Minute),
 		kgo.ClientID(Env("SERVICE_NAME", "fleetpulse")),
 	}
+	sec, err := kafkaSecurity()
+	if err != nil {
+		return nil, err
+	}
+	opts = append(opts, sec...)
 	return kgo.NewClient(append(opts, extra...)...)
 }
 

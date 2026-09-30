@@ -1,0 +1,41 @@
+# k6 API load test: 100 req/s for 5 min, 12 users across 3 tenants (docker compose, 4 vCPU host)
+/\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: tests/load/api.js
+        output: json (/tmp/claude-0/k6-load.json)
+
+     scenarios: (100.00%) 1 scenario, 300 max VUs, 5m30s max duration (incl. graceful stop):
+              * dashboard: 100.00 iterations/s for 5m0s (maxVUs: 100-300, gracefulStop: 30s)
+
+
+
+     ✓ status 200
+
+     checks.........................: 100.00% 30001 out of 30001
+     data_received..................: 438 MB  1.4 MB/s
+     data_sent......................: 30 MB   99 kB/s
+     http_req_blocked...............: avg=16.15µs min=3.33µs med=9.27µs   p(90)=13.02µs p(95)=16.38µs  p(99)=75.9µs   max=10.55ms 
+     http_req_connecting............: avg=2.63µs  min=0s     med=0s       p(90)=0s      p(95)=0s       p(99)=0s       max=10.45ms 
+   ✓ http_req_duration..............: avg=38.48ms min=3.17ms med=18.33ms  p(90)=73.53ms p(95)=134.7ms  p(99)=407.9ms  max=1.41s   
+       { expected_response:true }...: avg=38.48ms min=3.17ms med=18.33ms  p(90)=73.53ms p(95)=134.7ms  p(99)=407.9ms  max=1.41s   
+     ✓ { kind:detail }..............: avg=39.36ms min=5.65ms med=15.33ms  p(90)=70.67ms p(95)=147.17ms p(99)=481.37ms max=1.41s   
+     ✓ { kind:list }................: avg=47.98ms min=7.43ms med=26.78ms  p(90)=88.48ms p(95)=154.57ms p(99)=404.14ms max=1.16s   
+   ✓ http_req_failed................: 0.00%   0 out of 30025
+     http_req_receiving.............: avg=1.03ms  min=22.2µs med=401.94µs p(90)=1.85ms  p(95)=3.28ms   p(99)=11.67ms  max=212.38ms
+     http_req_sending...............: avg=58.96µs min=8.01µs med=44.53µs  p(90)=84.91µs p(95)=118.11µs p(99)=307.76µs max=6.57ms  
+     http_req_tls_handshaking.......: avg=0s      min=0s     med=0s       p(90)=0s      p(95)=0s       p(99)=0s       max=0s      
+     http_req_waiting...............: avg=37.39ms min=3ms    med=17.72ms  p(90)=71.36ms p(95)=131.03ms p(99)=399.98ms max=1.4s    
+     http_reqs......................: 30025   99.40174/s
+     iteration_duration.............: avg=39.25ms min=3.54ms med=19.2ms   p(90)=74.2ms  p(95)=135.7ms  p(99)=409.58ms max=1.41s   
+     iterations.....................: 30001   99.322285/s
+     vehicle_page_size..............: avg=50      min=50     med=50       p(90)=50      p(95)=50       p(99)=50       max=50      
+     vus............................: 2       min=0              max=49 
+     vus_max........................: 100     min=100            max=100
+
+
+dashboard ✓ [ 100% ] 000/100 VUs  5m0s  100.00 iters/s

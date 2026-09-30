@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # Copilot
     anthropic_api_key: str = Field(default="", repr=False)
     llm_model: str = "claude-opus-5-5"
+    # Per-million-token list prices used for the cost estimate shown in the UI.
+    llm_usd_per_mtok_in: float = 4.0
+    llm_usd_per_mtok_out: float = 20.0
     llm_effort: str = "medium"
     llm_max_tool_calls: int = 6
     llm_timeout_s: float = 60.0

@@ -1,0 +1,8 @@
+apiVersion: v2
+name: fleetpulse
+description: FleetPulse connected-fleet intelligence platform (ingest, stream processing, API, web, analytics)
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+kubeVersion: ">=1.27.0-0"
+keywords: [telematics, fleet, predictive-maintenance, kafka, clickhouse]

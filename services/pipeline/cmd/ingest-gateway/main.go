@@ -62,9 +62,14 @@ func main() {
 
 	if url := platform.Env("MQTT_URL", ""); url != "" {
 		host, _ := os.Hostname()
-		_, err := ingest.StartMQTT(ctx, ingest.MQTTConfig{URL: url, ClientID: "gw-" + host,
+		tlsCfg, err := platform.ClientTLS("MQTT")
+		if err != nil {
+			log.Error("mqtt tls", "err", err)
+			os.Exit(1)
+		}
+		_, err = ingest.StartMQTT(ctx, ingest.MQTTConfig{URL: url, ClientID: "gw-" + host,
 			Username: platform.Env("MQTT_USERNAME", ""), Password: platform.Env("MQTT_PASSWORD", ""),
-			Topic: platform.Env("MQTT_TOPIC", "$share/ingest/fleetpulse/oem/+/telemetry")}, g, log)
+			Topic: platform.Env("MQTT_TOPIC", "$share/ingest/fleetpulse/oem/+/telemetry"), TLS: tlsCfg}, g, log)
 		if err != nil {
 			log.Error("mqtt", "err", err)
 			os.Exit(1)

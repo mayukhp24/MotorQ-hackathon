@@ -1,0 +1,46 @@
+{{- $c := dict "root" $ "component" "sink-writer" -}}
+{{- $v := .Values.sinkWriter -}}
+# Kafka -> PostgreSQL for alerts and trips (idempotent upserts keyed by event id).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sink-writer
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  replicas: {{ $v.replicas }}
+  selector:
+    matchLabels:
+      {{- include "fp.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fp.selector" $c | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9104"
+    spec:
+      {{- include "fp.podSpecCommon" . | nindent 6 }}
+      {{- include "fp.spread" $c | nindent 6 }}
+      containers:
+        - name: sink-writer
+          image: {{ include "fp.image" (dict "root" $ "image" "pipeline") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["/usr/local/bin/sink-writer"]
+          ports: [{name: ops, containerPort: 9104}]
+          envFrom: [{configMapRef: {name: fleetpulse-config}}]
+          env:
+            {{- include "fp.pipelineEnv" . | nindent 12 }}
+            - {name: SERVICE_NAME, value: sink-writer}
+          {{- include "fp.opsProbes" (dict "port" "ops") | nindent 10 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- include "fp.dbCaMount" . | nindent 12 }}
+      volumes:
+        {{- include "fp.tmpVolume" . | nindent 8 }}
+        {{- include "fp.dbCaVolume" . | nindent 8 }}
+{{ include "fp.pdb" $c }}

@@ -1,0 +1,87 @@
+{{- $c := dict "root" $ "component" "ingest-gateway" -}}
+{{- $v := .Values.ingestGateway -}}
+# OEM-cloud edge: HTTPS push (API key + client certificate at the ingress) and
+# MQTT shared-subscription consumer (mTLS). Stateless; scales on CPU.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ingest-gateway
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  {{- if not $v.autoscaling.enabled }}
+  replicas: {{ $v.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "fp.selector" $c | nindent 6 }}
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 0, maxSurge: 25%}}
+  template:
+    metadata:
+      labels:
+        {{- include "fp.selector" $c | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9101"
+    spec:
+      {{- include "fp.podSpecCommon" . | nindent 6 }}
+      {{- include "fp.spread" $c | nindent 6 }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: ingest-gateway
+          image: {{ include "fp.image" (dict "root" $ "image" "pipeline") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["/usr/local/bin/ingest-gateway"]
+          ports:
+            - {name: http, containerPort: 8080}
+            - {name: ops, containerPort: 9101}
+          envFrom: [{configMapRef: {name: fleetpulse-config}}]
+          env:
+            {{- include "fp.pipelineEnv" . | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "INGEST_API_KEYS") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "MQTT_PASSWORD" "key" "MQTT_GATEWAY_PASSWORD") | nindent 12 }}
+            - {name: SERVICE_NAME, value: ingest-gateway}
+            - {name: INGEST_MAX_INFLIGHT, value: {{ $v.maxInflight | quote }}}
+            - {name: MQTT_URL, value: {{ .Values.endpoints.mqtt.url | quote }}}
+            - {name: MQTT_TOPIC, value: {{ .Values.endpoints.mqtt.topic | quote }}}
+            - {name: MQTT_USERNAME, value: gateway}
+            {{- if .Values.mqttClientCertSecret }}
+            - {name: MQTT_TLS, value: "true"}
+            - {name: MQTT_TLS_CA_FILE, value: /etc/fleetpulse/mqtt/ca.crt}
+            - {name: MQTT_TLS_CERT_FILE, value: /etc/fleetpulse/mqtt/tls.crt}
+            - {name: MQTT_TLS_KEY_FILE, value: /etc/fleetpulse/mqtt/tls.key}
+            {{- end }}
+          {{- include "fp.opsProbes" (dict "port" "ops") | nindent 10 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- if .Values.mqttClientCertSecret }}
+            - {name: mqtt-tls, mountPath: /etc/fleetpulse/mqtt, readOnly: true}
+            {{- end }}
+            {{- include "fp.dbCaMount" . | nindent 12 }}
+      volumes:
+        {{- include "fp.tmpVolume" . | nindent 8 }}
+        {{- if .Values.mqttClientCertSecret }}
+        - name: mqtt-tls
+          secret: {secretName: {{ .Values.mqttClientCertSecret }}}
+        {{- end }}
+        {{- include "fp.dbCaVolume" . | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingest-gateway
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  type: {{ $v.service.type }}
+  selector:
+    {{- include "fp.selector" $c | nindent 4 }}
+  ports:
+    - {name: http, port: {{ $v.service.port }}, targetPort: http}
+    - {name: ops, port: 9101, targetPort: ops}
+{{ include "fp.hpa" (dict "root" $ "component" "ingest-gateway" "cfg" $v.autoscaling) }}
+{{ include "fp.pdb" $c }}

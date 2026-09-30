@@ -1,0 +1,50 @@
+{{- $c := dict "root" $ "component" "web" -}}
+{{- $v := .Values.web -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  replicas: {{ $v.replicas }}
+  selector:
+    matchLabels:
+      {{- include "fp.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fp.selector" $c | nindent 8 }}
+    spec:
+      {{- include "fp.podSpecCommon" . | nindent 6 }}
+      {{- include "fp.spread" $c | nindent 6 }}
+      containers:
+        - name: web
+          image: {{ include "fp.image" (dict "root" $ "image" "web") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports: [{name: http, containerPort: 8080}]
+          livenessProbe: {httpGet: {path: /, port: http}, periodSeconds: 15}
+          readinessProbe: {httpGet: {path: /, port: http}, periodSeconds: 5}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            - {name: nginx-cache, mountPath: /var/cache/nginx}
+      volumes:
+        {{- include "fp.tmpVolume" . | nindent 8 }}
+        - name: nginx-cache
+          emptyDir: {sizeLimit: 64Mi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: web
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  selector:
+    {{- include "fp.selector" $c | nindent 4 }}
+  ports: [{name: http, port: 80, targetPort: http}]
+{{ include "fp.pdb" $c }}

@@ -52,16 +52,25 @@ async def fleet_summary(ctx: AppContext, p: Principal) -> dict[str, Any]:
     return summary
 
 
+# vehicle_risk_current is a security_barrier view, so Postgres will not push a
+# join condition into it: a plain LEFT JOIN scans and sorts every risk row of the
+# tenant (55K rows, ~390 ms) to return one page. Unfiltered pages therefore
+# probe the view per row through a fenced LATERAL (OFFSET 0 stops the planner
+# flattening it back into a join): 51 unique-index lookups, ~2 ms. A risk_min
+# filter is selective on the (tenant_id, risk_7d) index, so it keeps the join.
 VEHICLE_LIST_SQL = """
 SELECT v.vin, v.plate, v.model_year, v.status, v.fleet_id, f.name AS fleet_name, m.name AS model,
        m.oem_code, m.powertrain, r.risk_7d, r.top_component
 FROM vehicle v
 JOIN fleet f ON f.fleet_id = v.fleet_id
 JOIN vehicle_model m ON m.model_id = v.model_id
-LEFT JOIN vehicle_risk_current r ON r.vin = v.vin
+{risk_join}
 {where}
 ORDER BY v.vin
 LIMIT {limit}"""
+RISK_PROBE = ("LEFT JOIN LATERAL (SELECT rc.risk_7d, rc.top_component FROM vehicle_risk_current rc "
+              "WHERE rc.vin = v.vin OFFSET 0) r ON true")
+RISK_FILTER_JOIN = "JOIN vehicle_risk_current r ON r.vin = v.vin"
 
 
 async def list_vehicles(ctx: AppContext, p: Principal, *, cursor: str | None, limit: int, fleet_id: str | None,
@@ -76,7 +85,8 @@ async def list_vehicles(ctx: AppContext, p: Principal, *, cursor: str | None, li
         term = q.strip().upper()
         w.add("(v.vin LIKE {} OR upper(v.plate) LIKE {})", term + "%", term + "%")
     w.add_if(risk_min is not None, "r.risk_7d >= {}", risk_min)
-    sql = VEHICLE_LIST_SQL.format(where=w.sql(), limit=limit + 1)
+    sql = VEHICLE_LIST_SQL.format(risk_join=RISK_FILTER_JOIN if risk_min is not None else RISK_PROBE,
+                                  where=w.sql(), limit=limit + 1)
     async with db.tenant_tx(p.tenant_id) as conn:
         recs = db.rows(await conn.fetch(sql, *w.args))
     more = len(recs) > limit

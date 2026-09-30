@@ -1,0 +1,56 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fleetpulse-config
+  labels:
+    {{- include "fp.labels" . | nindent 4 }}
+data:
+  ENVIRONMENT: {{ .Values.global.environment | quote }}
+  LOG_LEVEL: "info"
+  KAFKA_BROKERS: {{ .Values.endpoints.kafkaBrokers | quote }}
+  KAFKA_TLS: {{ .Values.endpoints.kafka.tls | quote }}
+  KAFKA_SASL_MECHANISM: {{ .Values.endpoints.kafka.saslMechanism | quote }}
+  TELEMETRY_PARTITIONS: {{ .Values.endpoints.kafka.partitions | quote }}
+  TELEMETRY_RETENTION_H: {{ .Values.endpoints.kafka.retentionHours | quote }}
+  TELEMETRY_RETENTION_BYTES: "-1"
+  CLICKHOUSE_URL: {{ .Values.endpoints.clickhouse.url | quote }}
+  CH_HOT_DAYS: {{ .Values.endpoints.clickhouse.hotDays | quote }}
+  CH_RETENTION_DAYS: {{ .Values.endpoints.clickhouse.retentionDays | quote }}
+---
+{{- if .Values.serviceAccount.create }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: fleetpulse
+  labels:
+    {{- include "fp.labels" . | nindent 4 }}
+  {{- with .Values.serviceAccount.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+automountServiceAccountToken: false
+{{- end }}
+{{- if .Values.externalSecrets.enabled }}
+---
+# Synced from the cloud secret manager by External Secrets Operator; nothing
+# secret is stored in this chart, in Git or in Helm release history.
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
+metadata:
+  name: {{ .Values.secrets.name }}
+  labels:
+    {{- include "fp.labels" . | nindent 4 }}
+spec:
+  refreshInterval: {{ .Values.externalSecrets.refreshInterval }}
+  secretStoreRef:
+    {{- toYaml .Values.externalSecrets.secretStoreRef | nindent 4 }}
+  target:
+    name: {{ .Values.secrets.name }}
+    creationPolicy: Owner
+  data:
+    {{- range .Values.secrets.keys }}
+    - secretKey: {{ . }}
+      remoteRef:
+        key: {{ printf "%s%s" $.Values.externalSecrets.remoteKeyPrefix (lower (replace "_" "-" .)) }}
+    {{- end }}
+{{- end }}

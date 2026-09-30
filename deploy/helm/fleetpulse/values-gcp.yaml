@@ -1,0 +1,24 @@
+# Google Cloud (GKE) overlay – same chart, different managed services:
+# Cloud SQL for PostgreSQL (pgvector), Memorystore for Redis, Managed Service
+# for Apache Kafka, ClickHouse on GKE (Altinity operator) with GCS cold tier.
+endpoints:
+  kafkaBrokers: "bootstrap.fleetpulse.europe-west1.managedkafka.PROJECT.cloud.goog:9092"
+  kafka: {tls: true, saslMechanism: "", partitions: 48, retentionHours: 72}
+  postgres: {host: 10.60.0.3, adminUser: fleetpulse_admin, sslmode: verify-ca, caConfigMap: cloudsql-ca}
+  redis: {host: 10.60.1.4, port: 6378, tls: true}
+  clickhouse: {url: "https://clickhouse.fleetpulse.svc:8443"}
+  mqtt: {url: "ssl://emqx.fleetpulse.svc:8883"}
+
+externalSecrets:
+  secretStoreRef: {kind: ClusterSecretStore, name: gcp-secret-manager}
+  remoteKeyPrefix: fleetpulse-prod-
+
+serviceAccount:
+  annotations:
+    iam.gke.io/gcp-service-account: fleetpulse-workloads@PROJECT.iam.gserviceaccount.com
+
+networkPolicy:
+  dataServiceCIDRs: ["10.60.0.0/16"]
+
+analytics:
+  artifacts: {storageClass: premium-rwo, size: 5Gi}

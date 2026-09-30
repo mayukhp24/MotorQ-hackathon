@@ -1,0 +1,68 @@
+{{- $v := .Values.analytics -}}
+# Batch analytics as CronJobs: read-model refresh, daily risk scoring, weekly
+# retraining (evaluated against rule baselines before activation) and weekly
+# knowledge-base re-embedding. Model artefacts live on a shared volume.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: analytics-artifacts
+  labels:
+    {{- include "fp.componentLabels" (dict "root" $ "component" "analytics") | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with $v.artifacts.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+  resources: {requests: {storage: {{ $v.artifacts.size }}}}
+{{- range $job, $schedule := $v.schedules }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: analytics-{{ $job }}
+  labels:
+    {{- include "fp.componentLabels" (dict "root" $ "component" (printf "analytics-%s" $job)) | nindent 4 }}
+spec:
+  schedule: {{ $schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 5
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 7200
+      template:
+        metadata:
+          labels:
+            {{- include "fp.selector" (dict "root" $ "component" "analytics") | nindent 12 }}
+        spec:
+          {{- include "fp.podSpecCommon" $ | nindent 10 }}
+          restartPolicy: OnFailure
+          containers:
+            - name: analytics
+              image: {{ include "fp.image" (dict "root" $ "image" "analytics") }}
+              imagePullPolicy: {{ $.Values.global.imagePullPolicy }}
+              command: ["python", "-m", "analytics.run", {{ $job | quote }}]
+              envFrom: [{configMapRef: {name: fleetpulse-config}}]
+              env:
+                {{- include "fp.secretEnv" (dict "root" $ "name" "DB_WRITER_PASSWORD") | nindent 16 }}
+                {{- include "fp.secretEnv" (dict "root" $ "name" "CLICKHOUSE_PASSWORD") | nindent 16 }}
+                - name: DATABASE_URL
+                  value: {{ include "fp.pgUrl" (dict "root" $ "user" "fleetpulse_writer" "pwVar" "DB_WRITER_PASSWORD") | quote }}
+                - {name: CLICKHOUSE_USER, value: default}
+                - {name: ARTIFACTS_DIR, value: /app/artifacts}
+                - {name: OMP_NUM_THREADS, value: {{ $v.resources.limits.cpu | quote }}}
+              securityContext:
+                {{- toYaml $.Values.containerSecurityContext | nindent 16 }}
+              resources:
+                {{- toYaml $v.resources | nindent 16 }}
+              volumeMounts:
+                - {name: tmp, mountPath: /tmp}
+                - {name: artifacts, mountPath: /app/artifacts}
+                {{- include "fp.dbCaMount" $ | nindent 16 }}
+          volumes:
+            {{- include "fp.tmpVolume" $ | nindent 12 }}
+            - name: artifacts
+              persistentVolumeClaim: {claimName: analytics-artifacts}
+            {{- include "fp.dbCaVolume" $ | nindent 12 }}
+{{- end }}

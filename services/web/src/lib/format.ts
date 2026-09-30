@@ -10,7 +10,7 @@ export function fmtUsd(n: number | null | undefined, compact = false) {
   return Intl.NumberFormat("en-US", {
     style: "currency",
     currency: "USD",
-    maximumFractionDigits: 0,
+    maximumFractionDigits: compact ? 1 : 0,
     notation: compact ? "compact" : "standard",
   }).format(n);
 }

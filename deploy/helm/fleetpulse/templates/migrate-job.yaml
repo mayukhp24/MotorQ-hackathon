@@ -1,0 +1,53 @@
+{{- if .Values.migrations.enabled }}
+# Schema migrations (PostgreSQL roles/RLS/partitions, ClickHouse tables, Kafka
+# topics). Runs after first install and before every upgrade so new code never
+# meets an old schema; migrations are idempotent and versioned.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: fleetpulse-migrate
+  labels:
+    {{- include "fp.componentLabels" (dict "root" $ "component" "migrate") | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install,pre-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 6
+  activeDeadlineSeconds: 1800
+  template:
+    metadata:
+      labels:
+        {{- include "fp.selector" (dict "root" $ "component" "migrate") | nindent 8 }}
+    spec:
+      {{- include "fp.podSpecCommon" . | nindent 6 }}
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: {{ include "fp.image" (dict "root" $ "image" "pipeline") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["/usr/local/bin/migrate"]
+          envFrom: [{configMapRef: {name: fleetpulse-config}}]
+          env:
+            {{- include "fp.secretEnv" (dict "root" . "name" "DB_MIGRATE_PASSWORD") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "DB_API_PASSWORD") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "DB_WRITER_PASSWORD") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "CLICKHOUSE_PASSWORD") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "CLICKHOUSE_RO_PASSWORD") | nindent 12 }}
+            {{- if .Values.endpoints.kafka.saslMechanism }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "KAFKA_SASL_USERNAME") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "KAFKA_SASL_PASSWORD") | nindent 12 }}
+            {{- end }}
+            - name: MIGRATE_DATABASE_URL
+              value: {{ include "fp.pgUrl" (dict "root" . "user" .Values.endpoints.postgres.adminUser "pwVar" "DB_MIGRATE_PASSWORD") | quote }}
+            - {name: CH_KAFKA_CONSUMERS, value: "8"}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources: {requests: {cpu: 100m, memory: 128Mi}, limits: {cpu: "1", memory: 512Mi}}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- include "fp.dbCaMount" . | nindent 12 }}
+      volumes:
+        {{- include "fp.tmpVolume" . | nindent 8 }}
+        {{- include "fp.dbCaVolume" . | nindent 8 }}
+{{- end }}

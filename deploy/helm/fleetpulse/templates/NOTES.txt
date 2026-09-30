@@ -1,0 +1,10 @@
+FleetPulse {{ .Chart.AppVersion }} deployed to namespace {{ .Release.Namespace }}.
+
+  Web / API:  https://{{ .Values.ingress.host }}
+  OEM ingest: https://{{ .Values.ingress.ingestHost }}/v1/telemetry/{oem}
+
+Check the rollout:
+  kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/part-of=fleetpulse
+  kubectl -n {{ .Release.Namespace }} logs job/fleetpulse-migrate
+
+Secrets are read from "{{ .Values.secrets.name }}"{{ if .Values.externalSecrets.enabled }} (synced by External Secrets Operator){{ end }}.

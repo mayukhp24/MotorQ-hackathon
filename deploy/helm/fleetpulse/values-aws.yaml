@@ -1,0 +1,35 @@
+# Amazon Web Services (EKS) overlay. Endpoints are Terraform outputs
+# (infra/terraform/aws): `terraform output -json helm_values` prints this block.
+global:
+  imageRegistry: ghcr.io/your-org
+
+endpoints:
+  kafkaBrokers: "b-1.fleetpulse.xxxxxx.kafka.eu-west-1.amazonaws.com:9096,b-2.fleetpulse.xxxxxx.kafka.eu-west-1.amazonaws.com:9096,b-3.fleetpulse.xxxxxx.kafka.eu-west-1.amazonaws.com:9096"
+  kafka: {tls: true, saslMechanism: SCRAM-SHA-512, partitions: 48, retentionHours: 72}
+  postgres:
+    host: fleetpulse.cluster-xxxxxx.eu-west-1.rds.amazonaws.com
+    adminUser: fleetpulse_admin
+    sslmode: verify-full
+    caConfigMap: rds-ca          # kubectl create configmap rds-ca --from-file=ca.pem=global-bundle.pem
+  redis: {host: master.fleetpulse.xxxxxx.euw1.cache.amazonaws.com, port: 6379, tls: true}
+  clickhouse: {url: "https://clickhouse.fleetpulse.svc:8443", hotDays: 7, retentionDays: 395}
+  mqtt: {url: "ssl://xxxxxx-ats.iot.eu-west-1.amazonaws.com:8883"}
+
+externalSecrets:
+  secretStoreRef: {kind: ClusterSecretStore, name: aws-secrets-manager}
+  remoteKeyPrefix: fleetpulse/prod/
+
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/fleetpulse-workloads
+
+networkPolicy:
+  dataServiceCIDRs: ["10.40.0.0/16"]
+
+analytics:
+  artifacts: {storageClass: gp3, size: 5Gi}
+
+ingress:
+  className: nginx
+  host: fleetpulse.example.com
+  ingestHost: ingest.fleetpulse.example.com

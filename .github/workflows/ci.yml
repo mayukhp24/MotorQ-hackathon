@@ -1,0 +1,232 @@
+# FleetPulse CI: build, lint, unit/integration/contract tests with coverage
+# gates, dependency/secret/SAST/container scanning, then an end-to-end run of
+# the whole stack (BDD acceptance, k6 smoke, OWASP ZAP baseline).
+name: ci
+
+on:
+  push:
+    branches: [main, "claude/**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+
+jobs:
+  pipeline:
+    name: Go pipeline – vet, test, contracts, coverage
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: services/pipeline}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: services/pipeline/go.mod
+          cache-dependency-path: services/pipeline/go.sum
+      - run: go vet ./...
+      - name: Unit + contract tests (race detector)
+        run: go test -race -count=1 -covermode=atomic -coverprofile=coverage.out ./internal/...
+      - name: Coverage gate (≥ 80 % excluding DB/Kafka wiring covered by e2e)
+        run: |
+          grep -v -E "/internal/(migrate|platform|seed)/" coverage.out > core.out
+          go tool cover -func=coverage.out | tail -1
+          pct=$(go tool cover -func=core.out | awk '/^total:/ {gsub("%","",$3); print $3}')
+          echo "core coverage: ${pct}%"; echo "### Go core coverage: ${pct}%" >> "$GITHUB_STEP_SUMMARY"
+          awk -v p="$pct" 'BEGIN { exit (p < 80) }'
+      - uses: actions/upload-artifact@v4
+        with: {name: go-coverage, path: services/pipeline/coverage.out}
+
+  fleet-api:
+    name: Fleet API – lint, unit + Testcontainers integration
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: services/fleet-api}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: services/fleet-api/pyproject.toml}
+      - run: pip install -e ".[test]" ruff==0.8.4
+      - run: ruff check .
+      - name: Tests (unit + integration against real Postgres/Redis)
+        run: pytest --cov=app --cov-report=term --cov-report=xml --cov-fail-under=80 --junitxml=junit.xml
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: api-test-reports, path: "services/fleet-api/coverage.xml\nservices/fleet-api/junit.xml"}
+
+  analytics:
+    name: Analytics – lint, model tests
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: services/analytics}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: "${{ env.PYTHON_VERSION }}", cache: pip, cache-dependency-path: services/analytics/pyproject.toml}
+      - run: pip install -e ".[test]" ruff==0.8.4
+      - run: ruff check .
+      - run: pytest --cov=analytics --cov-report=term --cov-report=xml
+        env: {OMP_NUM_THREADS: "2"}
+
+  web:
+    name: Web – typecheck, unit tests, build
+    runs-on: ubuntu-latest
+    defaults: {run: {working-directory: services/web}}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "${{ env.NODE_VERSION }}", cache: npm, cache-dependency-path: services/web/package-lock.json}
+      - run: npm ci
+      - run: npm run lint
+      - run: npm test
+      - run: npm run build
+      - run: npm audit --omit=dev --audit-level=high
+
+  security:
+    name: Security – secrets, SAST, dependencies, IaC
+    runs-on: ubuntu-latest
+    permissions: {contents: read, security-events: write}
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - name: Secret scan (gitleaks)
+        uses: gitleaks/gitleaks-action@v2
+        env: {GITHUB_TOKEN: "${{ secrets.GITHUB_TOKEN }}"}
+      - name: SAST (Semgrep)
+        run: |
+          pipx run semgrep==1.101.0 scan --error --metrics=off \
+            --config p/owasp-top-ten --config p/python --config p/golang --config p/typescript --config p/dockerfile \
+            --exclude tests --exclude '*_test.go' --sarif --output semgrep.sarif
+      - name: Go vulnerability check
+        working-directory: services/pipeline
+        run: go run golang.org/x/vuln/cmd/govulncheck@latest ./...
+      - name: Dependency + IaC scan (Trivy fs/config)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scanners: vuln,misconfig,secret
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-dirs: services/web/node_modules
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with: {sarif_file: semgrep.sarif, category: semgrep}
+
+  iac:
+    name: IaC – Helm lint/kubeconform, Terraform validate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with: {version: v3.16.3}
+      - name: Helm lint + schema validation (default, AWS, GCP, KEDA)
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/download/v0.6.7/kubeconform-linux-amd64.tar.gz | tar xz kubeconform
+          helm lint deploy/helm/fleetpulse
+          for v in "" "-f deploy/helm/fleetpulse/values-aws.yaml" "-f deploy/helm/fleetpulse/values-gcp.yaml" "--set streamProcessor.keda.enabled=true --set simulator.enabled=true"; do
+            helm template fp deploy/helm/fleetpulse $v | ./kubeconform -strict -summary -ignore-missing-schemas -kubernetes-version 1.30.0
+          done
+      - uses: hashicorp/setup-terraform@v3
+        with: {terraform_version: 1.9.8}
+      - name: Terraform fmt + validate
+        working-directory: infra/terraform/aws
+        run: |
+          terraform fmt -check -recursive
+          terraform init -backend=false -input=false
+          terraform validate
+
+  images:
+    name: Images – build, scan${{ github.ref_type == 'tag' && ', push' || '' }}
+    needs: [pipeline, fleet-api, analytics, web]
+    runs-on: ubuntu-latest
+    permissions: {contents: read, packages: write}
+    strategy:
+      matrix:
+        include:
+          - {name: pipeline, context: ., file: services/pipeline/Dockerfile}
+          - {name: fleet-api, context: ., file: services/fleet-api/Dockerfile}
+          - {name: analytics, context: ., file: services/analytics/Dockerfile}
+          - {name: web, context: services/web, file: services/web/Dockerfile}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.ref_type == 'tag'
+        with: {registry: ghcr.io, username: "${{ github.actor }}", password: "${{ secrets.GITHUB_TOKEN }}"}
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.file }}
+          load: true
+          tags: fleetpulse/${{ matrix.name }}:ci
+          cache-from: type=gha,scope=${{ matrix.name }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.name }}
+      - name: Image scan (Trivy)
+        uses: aquasecurity/trivy-action@0.28.0
+        with: {image-ref: "fleetpulse/${{ matrix.name }}:ci", severity: CRITICAL, ignore-unfixed: true, exit-code: "1"}
+      - name: SBOM (CycloneDX)
+        uses: aquasecurity/trivy-action@0.28.0
+        with: {image-ref: "fleetpulse/${{ matrix.name }}:ci", format: cyclonedx, output: "sbom-${{ matrix.name }}.cdx.json"}
+      - uses: actions/upload-artifact@v4
+        with: {name: "sbom-${{ matrix.name }}", path: "sbom-${{ matrix.name }}.cdx.json"}
+      - name: Push release image
+        if: github.ref_type == 'tag'
+        run: |
+          img=ghcr.io/${GITHUB_REPOSITORY_OWNER,,}/fleetpulse-${{ matrix.name }}:${GITHUB_REF_NAME}
+          docker tag fleetpulse/${{ matrix.name }}:ci "$img" && docker push "$img"
+
+  e2e:
+    name: End-to-end – compose stack, BDD, k6 smoke, ZAP baseline
+    needs: [pipeline, fleet-api, analytics, web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SIM_VEHICLES: "3000"
+      SEED_HISTORY_DAYS: "21"
+      SIM_INTERVAL: "5s"
+      API_WORKERS: "2"
+      PROCESSOR_REPLICAS: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start the stack
+        run: docker compose up -d --build --quiet-pull
+      - name: Wait for seed, API and first risk scores
+        run: |
+          for i in $(seq 1 120); do
+            state=$(docker compose ps -a --format '{{.Service}} {{.State}} {{.ExitCode}}' | awk '$1=="seed"{print $2" "$3}')
+            [ "$state" = "exited 0" ] && curl -sf localhost:8000/readyz >/dev/null && break
+            [ "${state%% *}" = "exited" ] && [ "$state" != "exited 0" ] && { docker compose logs seed migrate; exit 1; }
+            sleep 5
+          done
+          docker compose exec -T analytics python -m analytics.run all
+      - uses: actions/setup-python@v5
+        with: {python-version: "${{ env.PYTHON_VERSION }}"}
+      - name: BDD acceptance tests (behave)
+        working-directory: tests/bdd
+        run: |
+          pip install behave==1.2.6 requests==2.32.3
+          behave --format pretty --junit --junit-directory reports features
+      - name: k6 smoke (latency thresholds = NFRs)
+        uses: grafana/k6-action@v0.3.1
+        with: {filename: tests/load/api.js, flags: "-e PROFILE=smoke -e BASE_URL=http://localhost:8000"}
+      - name: DAST (OWASP ZAP baseline against the web app and API)
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: http://localhost:3000
+          rules_file_name: .zap/rules.tsv
+          cmd_options: "-I"   # warnings are reported; rules marked FAIL in .zap/rules.tsv break the build
+          allow_issue_writing: false
+          fail_action: true
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --tail=200
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: e2e-reports, path: tests/bdd/reports}

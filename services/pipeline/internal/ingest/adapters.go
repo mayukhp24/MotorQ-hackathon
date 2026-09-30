@@ -2,6 +2,7 @@ package ingest
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -70,7 +71,8 @@ type MQTTConfig struct {
 	ClientID string
 	Username string
 	Password string
-	Topic    string // e.g. $share/ingest/fleetpulse/oem/+/telemetry
+	Topic    string      // e.g. $share/ingest/fleetpulse/oem/+/telemetry
+	TLS      *tls.Config // ssl:// brokers; carries the client certificate for mTLS
 }
 
 // oemFromTopic extracts {oem} from fleetpulse/oem/{oem}/telemetry.
@@ -94,6 +96,9 @@ func StartMQTT(ctx context.Context, cfg MQTTConfig, g *Gateway, log *slog.Logger
 		SetKeepAlive(30 * time.Second)
 	if cfg.Username != "" {
 		opts.SetUsername(cfg.Username).SetPassword(cfg.Password)
+	}
+	if cfg.TLS != nil {
+		opts.SetTLSConfig(cfg.TLS)
 	}
 	handler := func(_ mqtt.Client, m mqtt.Message) {
 		o := oemFromTopic(m.Topic())

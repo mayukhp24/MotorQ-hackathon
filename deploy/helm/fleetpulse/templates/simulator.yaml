@@ -1,0 +1,37 @@
+{{- if .Values.simulator.enabled }}
+{{- $c := dict "root" $ "component" "simulator" -}}
+# Demo/load environments only: 100K synthetic vehicles from three OEM clouds.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: simulator
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "fp.selector" $c | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "fp.selector" $c | nindent 8 }}
+    spec:
+      {{- include "fp.podSpecCommon" . | nindent 6 }}
+      containers:
+        - name: simulator
+          image: {{ include "fp.image" (dict "root" $ "image" "pipeline") }}
+          command: ["/usr/local/bin/simulator", "stream"]
+          env:
+            {{- include "fp.secretEnv" (dict "root" . "name" "INGEST_API_KEYS") | nindent 12 }}
+            - {name: SIM_VEHICLES, value: {{ .Values.simulator.vehicles | quote }}}
+            - {name: SIM_INTERVAL, value: {{ .Values.simulator.interval | quote }}}
+            - {name: SIM_TRANSPORT, value: {{ .Values.simulator.transport | quote }}}
+            - {name: INGEST_URL, value: "http://ingest-gateway:8080"}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources: {requests: {cpu: "2", memory: 2Gi}, limits: {cpu: "4", memory: 4Gi}}
+          volumeMounts: [{name: tmp, mountPath: /tmp}]
+      volumes:
+        {{- include "fp.tmpVolume" . | nindent 8 }}
+{{- end }}

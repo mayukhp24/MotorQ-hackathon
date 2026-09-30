@@ -1,0 +1,3 @@
+region      = "eu-west-1"
+environment = "prod"
+admin_cidrs = ["203.0.113.0/24"] # your office / VPN egress

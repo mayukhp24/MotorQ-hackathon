@@ -1,0 +1,93 @@
+{{- $c := dict "root" $ "component" "stream-processor" -}}
+{{- $v := .Values.streamProcessor -}}
+# Kafka consumer group: dedup, detection rules, trip segmentation, live state.
+# Parallelism is capped by telemetry.v1 partitions; scale on consumer lag (KEDA)
+# or CPU (HPA). Cooperative-sticky rebalancing keeps state moves small.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: stream-processor
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  {{- if not (or $v.autoscaling.enabled $v.keda.enabled) }}
+  replicas: {{ $v.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "fp.selector" $c | nindent 6 }}
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 1, maxSurge: 0}}
+  template:
+    metadata:
+      labels:
+        {{- include "fp.selector" $c | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9103"
+    spec:
+      {{- include "fp.podSpecCommon" . | nindent 6 }}
+      {{- include "fp.spread" $c | nindent 6 }}
+      terminationGracePeriodSeconds: 60
+      containers:
+        - name: stream-processor
+          image: {{ include "fp.image" (dict "root" $ "image" "pipeline") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          command: ["/usr/local/bin/stream-processor"]
+          ports: [{name: ops, containerPort: 9103}]
+          envFrom: [{configMapRef: {name: fleetpulse-config}}]
+          env:
+            {{- include "fp.pipelineEnv" . | nindent 12 }}
+            - {name: SERVICE_NAME, value: stream-processor}
+            - {name: GOMAXPROCS, valueFrom: {resourceFieldRef: {resource: limits.cpu}}}
+          {{- include "fp.opsProbes" (dict "port" "ops") | nindent 10 }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- include "fp.dbCaMount" . | nindent 12 }}
+      volumes:
+        {{- include "fp.tmpVolume" . | nindent 8 }}
+        {{- include "fp.dbCaVolume" . | nindent 8 }}
+{{- if $v.keda.enabled }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: stream-processor
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  scaleTargetRef: {name: stream-processor}
+  minReplicaCount: {{ $v.keda.minReplicas }}
+  maxReplicaCount: {{ min $v.keda.maxReplicas .Values.endpoints.kafka.partitions }}
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: {{ .Values.endpoints.kafkaBrokers | quote }}
+        consumerGroup: stream-processor
+        topic: telemetry.v1
+        lagThreshold: {{ $v.keda.lagThreshold | quote }}
+        {{- if .Values.endpoints.kafka.tls }}
+        tls: enable
+        {{- end }}
+        {{- if .Values.endpoints.kafka.saslMechanism }}
+        sasl: {{ lower (replace "-" "_" .Values.endpoints.kafka.saslMechanism) | replace "scram_sha_" "scram_sha" }}
+      authenticationRef: {name: stream-processor-kafka}
+        {{- end }}
+{{- if .Values.endpoints.kafka.saslMechanism }}
+---
+apiVersion: keda.sh/v1alpha1
+kind: TriggerAuthentication
+metadata:
+  name: stream-processor-kafka
+spec:
+  secretTargetRef:
+    - {parameter: username, name: {{ .Values.secrets.name }}, key: KAFKA_SASL_USERNAME}
+    - {parameter: password, name: {{ .Values.secrets.name }}, key: KAFKA_SASL_PASSWORD}
+{{- end }}
+{{- else }}
+{{ include "fp.hpa" (dict "root" $ "component" "stream-processor" "cfg" $v.autoscaling) }}
+{{- end }}
+{{ include "fp.pdb" $c }}

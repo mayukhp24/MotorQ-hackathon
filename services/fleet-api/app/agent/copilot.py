@@ -197,8 +197,9 @@ class Copilot:
         out.answer = answer or "I couldn't produce an answer from the available data."
         COPILOT_TOKENS.labels("input").inc(usage["input_tokens"])
         COPILOT_TOKENS.labels("output").inc(usage["output_tokens"])
-        # Opus 5.5 list price: $4 / $20 per MTok (cache reads $0.20).
-        usage["est_cost_usd"] = round(usage["input_tokens"] * 4e-6 + usage["output_tokens"] * 20e-6, 5)
+        # Estimate at list prices (configurable); cached reads are billed lower, so this is an upper bound.
+        usage["est_cost_usd"] = round((usage["input_tokens"] * s.llm_usd_per_mtok_in
+                                       + usage["output_tokens"] * s.llm_usd_per_mtok_out) / 1e6, 5)
         usage["model"] = s.llm_model
         out.usage = usage
         return out
@@ -269,7 +270,7 @@ def render_offline(calls: list[dict[str, Any]]) -> str:
             live, risk = r["live"], r["risk"] or {}
             lines += [f"**Fleet overview** – {r['vehicles']:,} vehicles, {live['online']:,} online "
                       f"({live['by_status'].get('DRIVING', 0):,} driving, {live['critical']} with active critical faults).",
-                      f"- Open alerts: " + ", ".join(f"{k} {v}" for k, v in sorted(r['open_alerts'].items())),
+                      "- Open alerts: " + ", ".join(f"{k} {v}" for k, v in sorted(r['open_alerts'].items())),
                       f"- Predicted breakdowns in the next 7 days: **{risk.get('expected_breakdowns_7d', 0):.0f}** "
                       f"({risk.get('high_risk', 0)} vehicles at high risk)",
                       f"- Savings opportunity from acting now: **{_usd(risk.get('savings_opportunity'))}**",

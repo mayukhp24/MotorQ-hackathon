@@ -1,0 +1,87 @@
+{{- $c := dict "root" $ "component" "fleet-api" -}}
+{{- $v := .Values.fleetApi -}}
+# Stateless REST/WebSocket API. The Service is named "fleet-api" because the
+# web image's nginx resolves that upstream name at start-up.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: fleet-api
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  {{- if not $v.autoscaling.enabled }}
+  replicas: {{ $v.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "fp.selector" $c | nindent 6 }}
+  strategy: {type: RollingUpdate, rollingUpdate: {maxUnavailable: 0, maxSurge: 25%}}
+  template:
+    metadata:
+      labels:
+        {{- include "fp.selector" $c | nindent 8 }}
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: /metrics
+    spec:
+      {{- include "fp.podSpecCommon" . | nindent 6 }}
+      {{- include "fp.spread" $c | nindent 6 }}
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: fleet-api
+          image: {{ include "fp.image" (dict "root" $ "image" "fleet-api") }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports: [{name: http, containerPort: 8000}]
+          envFrom: [{configMapRef: {name: fleetpulse-config}}]
+          env:
+            {{- include "fp.secretEnv" (dict "root" . "name" "DB_API_PASSWORD") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "REDIS_PASSWORD") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "CLICKHOUSE_PASSWORD" "key" "CLICKHOUSE_RO_PASSWORD") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "PII_ENCRYPTION_KEY") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "CURSOR_SECRET") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "JWT_PRIVATE_KEY_PEM") | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "ANTHROPIC_API_KEY" "optional" true) | nindent 12 }}
+            - name: DATABASE_URL
+              value: {{ include "fp.pgUrl" (dict "root" . "user" "fleetpulse_api" "pwVar" "DB_API_PASSWORD") | quote }}
+            - name: REDIS_URL
+              value: {{ include "fp.redisUrl" (dict "root" . "db" 1) | quote }}
+            - name: LIVE_REDIS_URL
+              value: {{ include "fp.redisUrl" (dict "root" . "db" 0) | quote }}
+            - {name: CLICKHOUSE_USER, value: fleetpulse_ro}
+            - {name: SERVICE_NAME, value: fleet-api}
+            - {name: WEB_CONCURRENCY, value: {{ $v.workers | quote }}}
+            - {name: LLM_MODEL, value: {{ $v.llmModel | quote }}}
+            - {name: CORS_ORIGINS, value: {{ $v.corsOrigins | quote }}}
+            - {name: JWT_ISSUER, value: {{ printf "https://%s/auth" .Values.ingress.host | quote }}}
+          livenessProbe:
+            httpGet: {path: /healthz, port: http}
+            periodSeconds: 10
+            failureThreshold: 6
+          readinessProbe:
+            httpGet: {path: /readyz, port: http}
+            periodSeconds: 5
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          resources:
+            {{- toYaml $v.resources | nindent 12 }}
+          volumeMounts:
+            - {name: tmp, mountPath: /tmp}
+            {{- include "fp.dbCaMount" . | nindent 12 }}
+      volumes:
+        {{- include "fp.tmpVolume" . | nindent 8 }}
+        {{- include "fp.dbCaVolume" . | nindent 8 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: fleet-api
+  labels:
+    {{- include "fp.componentLabels" $c | nindent 4 }}
+spec:
+  type: {{ $v.service.type }}
+  selector:
+    {{- include "fp.selector" $c | nindent 4 }}
+  ports: [{name: http, port: {{ $v.service.port }}, targetPort: http}]
+{{ include "fp.hpa" (dict "root" $ "component" "fleet-api" "cfg" $v.autoscaling) }}
+{{ include "fp.pdb" $c }}
