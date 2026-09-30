@@ -140,9 +140,13 @@ func EnsureTopics(ctx context.Context, cl *kgo.Client, log *slog.Logger) error {
 	adm := kadm.NewClient(cl)
 	rf := int16(EnvInt("KAFKA_REPLICATION", 1))
 	parts := int32(EnvInt("TELEMETRY_PARTITIONS", 12))
+	// Time- and size-bounded retention (whichever hits first); small segments
+	// so size-based deletion can actually reclaim space.
+	retBytes := strconv.Itoa(EnvInt("TELEMETRY_RETENTION_BYTES", 1<<30))
+	segBytes := strconv.Itoa(64 << 20)
 	retention := func(h int) map[string]*string {
 		v := strconv.Itoa(h * 3600 * 1000)
-		return map[string]*string{"retention.ms": &v}
+		return map[string]*string{"retention.ms": &v, "retention.bytes": &retBytes, "segment.bytes": &segBytes}
 	}
 	specs := []struct {
 		name  string

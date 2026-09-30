@@ -1,0 +1,43 @@
+groups:
+  - name: fleetpulse-slo
+    rules:
+      - alert: ConsumerLagHigh
+        expr: sum by (consumergroup) (kafka_consumergroup_lag_sum) > 500000
+        for: 5m
+        labels: {severity: page}
+        annotations: {summary: "Consumer group {{ $labels.consumergroup }} lag above 500K records"}
+      - alert: IngestToProcessLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(processor_ingest_to_process_seconds_bucket[5m]))) > 2
+        for: 5m
+        labels: {severity: page}
+        annotations: {summary: "p95 ingest-to-dashboard latency above the 2 s objective"}
+      - alert: CriticalAlertLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(processor_alert_latency_seconds_bucket[5m]))) > 5
+        for: 5m
+        labels: {severity: page}
+        annotations: {summary: "p95 critical-alert latency above the 5 s objective"}
+      - alert: ApiLatencyHigh
+        expr: histogram_quantile(0.95, sum by (le) (rate(api_request_duration_seconds_bucket{route!~"/api/v1/copilot.*"}[5m]))) > 0.2
+        for: 10m
+        labels: {severity: ticket}
+        annotations: {summary: "API p95 above 200 ms"}
+      - alert: ApiErrorRate
+        expr: sum(rate(api_requests_total{status=~"5.."}[5m])) / clamp_min(sum(rate(api_requests_total[5m])), 1) > 0.01
+        for: 5m
+        labels: {severity: page}
+        annotations: {summary: "API 5xx rate above 1%"}
+      - alert: IngestRejectSpike
+        expr: sum by (oem) (rate(ingest_events_total{result="rejected"}[5m])) / clamp_min(sum by (oem) (rate(ingest_events_total[5m])), 1) > 0.02
+        for: 10m
+        labels: {severity: ticket}
+        annotations: {summary: "{{ $labels.oem }} rejects above 2% – possible OEM format change"}
+      - alert: CircuitBreakerOpen
+        expr: max by (name) (api_circuit_breaker_open) == 1
+        for: 1m
+        labels: {severity: ticket}
+        annotations: {summary: "API circuit breaker {{ $labels.name }} open (degraded mode)"}
+      - alert: IngestBackpressure
+        expr: sum(rate(ingest_backpressure_total[5m])) > 1
+        for: 5m
+        labels: {severity: ticket}
+        annotations: {summary: "Gateway shedding load – scale ingest/Kafka"}

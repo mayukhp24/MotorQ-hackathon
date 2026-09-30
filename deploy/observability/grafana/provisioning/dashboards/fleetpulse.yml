@@ -1,0 +1,6 @@
+apiVersion: 1
+providers:
+  - name: fleetpulse
+    folder: FleetPulse
+    type: file
+    options: {path: /var/lib/grafana/dashboards}
