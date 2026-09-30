@@ -1,0 +1,148 @@
+{
+  "test_rows": 638358,
+  "positives": 12805,
+  "base_rate": 0.02006,
+  "capacity_share": 0.01,
+  "k": 6383,
+  "methods": {
+    "model": {
+      "pr_auc": 0.6578,
+      "roc_auc": 0.8694,
+      "precision_at_k": 0.9091,
+      "recall_at_k": 0.4532,
+      "net_savings_usd_in_test_window": 8293010
+    },
+    "any_dtc_last_7d": {
+      "pr_auc": 0.1825,
+      "roc_auc": 0.7545,
+      "precision_at_k": 0.4293,
+      "recall_at_k": 0.214,
+      "net_savings_usd_in_test_window": 4063450
+    },
+    "threshold_alert_rules": {
+      "pr_auc": 0.2106,
+      "roc_auc": 0.777,
+      "precision_at_k": 0.4109,
+      "recall_at_k": 0.2048,
+      "net_savings_usd_in_test_window": 4307060
+    }
+  },
+  "lift_vs_rules": {
+    "precision_at_k": 2.21,
+    "pr_auc": 3.12
+  },
+  "components": {
+    "cooling": {
+      "positives": 3628,
+      "pr_auc": 0.696,
+      "roc_auc": 0.9126
+    },
+    "battery12v": {
+      "positives": 5425,
+      "pr_auc": 0.7003,
+      "roc_auc": 0.8799
+    },
+    "misfire": {
+      "positives": 2764,
+      "pr_auc": 0.465,
+      "roc_auc": 0.8719
+    },
+    "ev_pack": {
+      "positives": 1081,
+      "pr_auc": 0.5554,
+      "roc_auc": 0.9527
+    }
+  },
+  "calibration": [
+    {
+      "decile": 0,
+      "predicted": 0.0017,
+      "observed": 0.0035
+    },
+    {
+      "decile": 1,
+      "predicted": 0.0026,
+      "observed": 0.0049
+    },
+    {
+      "decile": 2,
+      "predicted": 0.0033,
+      "observed": 0.0049
+    },
+    {
+      "decile": 3,
+      "predicted": 0.0039,
+      "observed": 0.0057
+    },
+    {
+      "decile": 4,
+      "predicted": 0.0045,
+      "observed": 0.0062
+    },
+    {
+      "decile": 5,
+      "predicted": 0.0051,
+      "observed": 0.0062
+    },
+    {
+      "decile": 6,
+      "predicted": 0.0057,
+      "observed": 0.0063
+    },
+    {
+      "decile": 7,
+      "predicted": 0.0064,
+      "observed": 0.0063
+    },
+    {
+      "decile": 8,
+      "predicted": 0.0077,
+      "observed": 0.0077
+    },
+    {
+      "decile": 9,
+      "predicted": 0.1478,
+      "observed": 0.1489
+    }
+  ],
+  "train_rows": 248372,
+  "train_positives": 18677,
+  "train_period": [
+    "2026-08-15",
+    "2026-09-07"
+  ],
+  "test_period": [
+    "2026-09-08",
+    "2026-09-22"
+  ],
+  "features": [
+    "age_years",
+    "odo",
+    "is_ev",
+    "is_hev",
+    "max_coolant_7d",
+    "avg_coolant_3d",
+    "coolant_trend",
+    "min_batt_v_7d",
+    "avg_batt_v_3d",
+    "batt_v_trend",
+    "max_pack_temp_7d",
+    "avg_pack_3d",
+    "pack_trend",
+    "dtc_cooling_7d",
+    "dtc_battery_7d",
+    "dtc_misfire_7d",
+    "dtc_evpack_7d",
+    "dtc_total_7d",
+    "dtc_total_3d",
+    "dtc_cooling_3d",
+    "dtc_battery_3d",
+    "dtc_misfire_3d",
+    "dtc_evpack_3d",
+    "harsh_7d",
+    "km_7d",
+    "idle_ratio_7d",
+    "days_active_7d"
+  ],
+  "negative_sample_rate": 0.25
+}

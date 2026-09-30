@@ -1,0 +1,28 @@
+[project]
+name = "fleetpulse-analytics"
+version = "1.0.0"
+description = "FleetPulse batch analytics: feature engineering, predictive-maintenance training/scoring, knowledge base"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy==2.2.1",
+  "pandas==2.2.3",
+  "pyarrow==18.1.0",
+  "scikit-learn==1.6.0",
+  "psycopg[binary]==3.2.3",
+  "httpx==0.28.1",
+  "prometheus-client==0.21.1",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.3.4", "pytest-cov==6.0.0"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["analytics*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
