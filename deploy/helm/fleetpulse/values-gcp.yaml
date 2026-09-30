@@ -3,7 +3,7 @@
 # for Apache Kafka, ClickHouse on GKE (Altinity operator) with GCS cold tier.
 endpoints:
   kafkaBrokers: "bootstrap.fleetpulse.europe-west1.managedkafka.PROJECT.cloud.goog:9092"
-  kafka: {tls: true, saslMechanism: "", partitions: 48, retentionHours: 72}
+  kafka: {tls: true, saslMechanism: "", partitions: 48, replicationFactor: 3, retentionHours: 24, enrichedRetentionHours: 6}
   postgres: {host: 10.60.0.3, adminUser: fleetpulse_admin, sslmode: verify-ca, caConfigMap: cloudsql-ca}
   redis: {host: 10.60.1.4, port: 6378, tls: true}
   clickhouse: {url: "https://clickhouse.fleetpulse.svc:8443"}

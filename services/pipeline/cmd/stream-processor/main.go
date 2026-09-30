@@ -76,7 +76,7 @@ func main() {
 		}
 	}()
 	go func() {
-		t := time.NewTicker(platform.EnvDuration("SNAPSHOT_EVERY", 2*time.Second))
+		t := time.NewTicker(platform.EnvDuration("SNAPSHOT_EVERY", time.Second))
 		defer t.Stop()
 		var last int64
 		for i := 0; ; i++ {

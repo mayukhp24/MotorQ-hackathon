@@ -16,7 +16,9 @@ endpoints:
     tls: true
     saslMechanism: SCRAM-SHA-512      # "" to disable
     partitions: 48                    # telemetry.v1 partitions (processor parallelism ceiling)
-    retentionHours: 72
+    replicationFactor: 3              # topics are created with this RF (min.insync.replicas 2 on the brokers)
+    retentionHours: 24                # raw replay window (docs/capacity.md: ~3.2 TB at RF 3)
+    enrichedRetentionHours: 6         # enriched stream only feeds ClickHouse
   postgres:
     host: postgres
     port: 5432
@@ -30,8 +32,8 @@ endpoints:
     tls: true                         # password from secret
   clickhouse:
     url: "https://clickhouse:8443"
-    hotDays: 7
-    retentionDays: 395
+    hotDays: 7                        # NVMe; then S3 cold tier
+    retentionDays: 90                 # raw 1 Hz rows; daily/hourly rollups keep 2 years
   mqtt:
     url: "ssl://mqtt:8883"            # devices and OEM clouds connect with mTLS
     topic: "$share/ingest/fleetpulse/oem/+/telemetry"

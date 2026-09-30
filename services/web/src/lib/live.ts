@@ -53,7 +53,7 @@ export function useLiveStream(enabled = true) {
           const msg = JSON.parse(ev.data);
           if (msg.type === "kpi") {
             setKpi(msg.data);
-            setEps((h) => [...h.slice(-89), { t: Date.now(), eps: msg.data.eps }]);
+            setEps((h) => [...h.slice(-179), { t: Date.now(), eps: msg.data.eps }]); // 3 min at 1 s pushes
           } else if (msg.type === "alert") {
             const incoming = msg.data as LiveAlert;
             // At-least-once delivery upstream: drop repeats of the same alert.

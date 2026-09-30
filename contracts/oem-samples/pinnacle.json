@@ -1,0 +1,42 @@
+{
+  "data": [
+    {
+      "VIN": "PNCTRH5DXJD000019",
+      "EventTime": "2026-09-21T14:13:21.000Z",
+      "Seq": 17900000002,
+      "Lat": 23.020094,
+      "Lng": 72.618343,
+      "Hdg": 282,
+      "SpeedMph": 22.866,
+      "AccelG": -0.2050,
+      "OdometerMi": 128486.2335,
+      "Ign": "ON",
+      "Chg": "N",
+      "RPM": 1776,
+      "CoolantF": 188.78,
+      "LoadPct": 34.6,
+      "FuelPct": 25.0,
+      "BattV": 13.72,
+      "TireMinPsi": 34.330
+    },
+    {
+      "VIN": "PNCMTR3P3NG000022",
+      "EventTime": "2026-09-21T14:13:21.000Z",
+      "Seq": 17900000002,
+      "Lat": 18.555584,
+      "Lng": 73.829089,
+      "Hdg": 7,
+      "SpeedMph": 15.348,
+      "AccelG": -0.1519,
+      "OdometerMi": 116691.7514,
+      "Ign": "ON",
+      "Chg": "N",
+      "RPM": 1414,
+      "CoolantF": 185.00,
+      "LoadPct": 29.1,
+      "FuelPct": 63.8,
+      "BattV": 13.93,
+      "TireMinPsi": 32.692
+    }
+  ]
+}

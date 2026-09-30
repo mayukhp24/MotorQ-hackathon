@@ -130,7 +130,7 @@ async def live_stream(ws: WebSocket, ticket: str = Query(...)) -> None:
         while True:
             kpi = await live_svc.merged_kpi(ctx.live, tenant, ctx.settings.snapshot_stale_s)
             await ws.send_text(orjson.dumps({"type": "kpi", "data": kpi}).decode())
-            await asyncio.sleep(2)
+            await asyncio.sleep(1)  # matches the processors' 1 s KPI snapshots: tiles are <= ~2 s old
 
     async def push_alerts() -> None:
         while True:

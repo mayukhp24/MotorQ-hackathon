@@ -89,7 +89,8 @@ resource "aws_elasticache_replication_group" "redis" {
 
 # ---------------------------------------------------------------- Kafka (MSK)
 # Event backbone. 3 brokers across AZs, RF=3/min ISR 2, SASL/SCRAM over TLS,
-# encrypted at rest; 72 h retention allows replay after a consumer bug.
+# encrypted at rest; 24 h raw retention allows replay after a consumer bug
+# (sizing in docs/capacity.md: ~4.3 TB at RF 3 incl. the 6 h enriched topic).
 resource "aws_msk_configuration" "kafka" {
   name              = local.name
   kafka_versions    = ["3.7.x"]
@@ -98,7 +99,7 @@ resource "aws_msk_configuration" "kafka" {
     default.replication.factor=3
     min.insync.replicas=2
     num.partitions=48
-    log.retention.hours=72
+    log.retention.hours=24
     compression.type=producer
     unclean.leader.election.enable=false
   PROPS
@@ -115,7 +116,7 @@ resource "aws_msk_cluster" "kafka" {
     security_groups = [aws_security_group.data.id]
     storage_info {
       ebs_storage_info {
-        volume_size = 2000
+        volume_size = 3000
       }
     }
   }
@@ -204,20 +205,33 @@ resource "aws_s3_bucket_versioning" "cold" {
   }
 }
 
+# ClickHouse's own TTL deletes raw parts at 90 days, so its prefix stays in
+# S3 Standard (parts are read on query); only backups age into Glacier.
 resource "aws_s3_bucket_lifecycle_configuration" "cold" {
   bucket = aws_s3_bucket.cold.id
   rule {
-    id     = "telemetry-archive"
+    id     = "all-objects"
     status = "Enabled"
-    filter {
-      prefix = "clickhouse/"
-    }
-    transition {
-      days          = 90
-      storage_class = "GLACIER_IR"
+    filter {}
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
     }
     noncurrent_version_expiration {
       noncurrent_days = 30
+    }
+  }
+  rule {
+    id     = "backups-archive"
+    status = "Enabled"
+    filter {
+      prefix = "backups/"
+    }
+    transition {
+      days          = 30
+      storage_class = "GLACIER_IR"
+    }
+    expiration {
+      days = 400
     }
   }
 }

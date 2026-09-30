@@ -1,0 +1,65 @@
+{
+  "oem": "aurora",
+  "records": [
+    {
+      "vehicle": {
+        "vin": "AURCGD4X0NB000001"
+      },
+      "timestamp": 1790000001000,
+      "sequence": 17900000002,
+      "position": {
+        "latitude": 17.424855,
+        "longitude": 78.458517,
+        "heading": 248
+      },
+      "motion": {
+        "speedKph": 23.9,
+        "accelMps2": -0.99
+      },
+      "powertrain": {
+        "odometerKm": 160001.891,
+        "engineOn": true,
+        "rpm": 1418,
+        "coolantTempC": 86.4,
+        "engineLoadPct": 28.7,
+        "fuelLevelPct": 53.2
+      },
+      "electrical": {
+        "batteryVoltage": 13.96
+      },
+      "chassis": {
+        "tyreMinKpa": 230.1
+      }
+    },
+    {
+      "vehicle": {
+        "vin": "AURCGD4X1MC000002"
+      },
+      "timestamp": 1790000001000,
+      "sequence": 17900000002,
+      "position": {
+        "latitude": 23.028222,
+        "longitude": 72.644178,
+        "heading": 249
+      },
+      "motion": {
+        "speedKph": 23.6,
+        "accelMps2": -1.61
+      },
+      "powertrain": {
+        "odometerKm": 231386.752,
+        "engineOn": true,
+        "rpm": 1393,
+        "coolantTempC": 86.5,
+        "engineLoadPct": 28.6,
+        "fuelLevelPct": 64.0
+      },
+      "electrical": {
+        "batteryVoltage": 13.80
+      },
+      "chassis": {
+        "tyreMinKpa": 232.0
+      }
+    }
+  ]
+}

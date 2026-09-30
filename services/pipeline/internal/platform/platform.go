@@ -228,7 +228,9 @@ func EnsureTopics(ctx context.Context, cl *kgo.Client, log *slog.Logger) error {
 		cfg   map[string]*string
 	}{
 		{TopicTelemetry, parts, retention(EnvInt("TELEMETRY_RETENTION_H", 24))},
-		{TopicEnriched, parts, retention(EnvInt("TELEMETRY_RETENTION_H", 24))},
+		// The enriched stream only feeds ClickHouse (seconds behind), so it
+		// needs a much shorter window than the raw replay topic.
+		{TopicEnriched, parts, retention(EnvInt("ENRICHED_RETENTION_H", EnvInt("TELEMETRY_RETENTION_H", 24)))},
 		{TopicAlerts, 6, retention(24 * 7)},
 		{TopicTrips, 6, retention(24 * 7)},
 		{TopicDLQ, 3, retention(24 * 7)},

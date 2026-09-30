@@ -11,7 +11,9 @@ data:
   KAFKA_TLS: {{ .Values.endpoints.kafka.tls | quote }}
   KAFKA_SASL_MECHANISM: {{ .Values.endpoints.kafka.saslMechanism | quote }}
   TELEMETRY_PARTITIONS: {{ .Values.endpoints.kafka.partitions | quote }}
+  KAFKA_REPLICATION: {{ .Values.endpoints.kafka.replicationFactor | quote }}
   TELEMETRY_RETENTION_H: {{ .Values.endpoints.kafka.retentionHours | quote }}
+  ENRICHED_RETENTION_H: {{ .Values.endpoints.kafka.enrichedRetentionHours | quote }}
   TELEMETRY_RETENTION_BYTES: "-1"
   CLICKHOUSE_URL: {{ .Values.endpoints.clickhouse.url | quote }}
   CH_HOT_DAYS: {{ .Values.endpoints.clickhouse.hotDays | quote }}

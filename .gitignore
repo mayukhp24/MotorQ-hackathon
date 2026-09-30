@@ -39,3 +39,4 @@ services/pipeline/vendor/
 *.tsbuildinfo
 coverage.xml
 !deploy/no-extra-ca.pem
+.hypothesis/

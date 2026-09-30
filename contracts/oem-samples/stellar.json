@@ -1,0 +1,147 @@
+{
+  "messages": [
+    {
+      "vin": "STLVLT4H6KA000000",
+      "t": 1790000001.000,
+      "n": 17900000002,
+      "signals": [
+        {
+          "name": "gps.lat",
+          "value": 18.521123
+        },
+        {
+          "name": "gps.lon",
+          "value": 73.836460
+        },
+        {
+          "name": "gps.heading",
+          "value": 8
+        },
+        {
+          "name": "speed",
+          "value": 5.861,
+          "unit": "m/s"
+        },
+        {
+          "name": "accel.long",
+          "value": -0.56,
+          "unit": "m/s2"
+        },
+        {
+          "name": "odometer",
+          "value": 272413087,
+          "unit": "m"
+        },
+        {
+          "name": "ignition",
+          "value": 1
+        },
+        {
+          "name": "rpm",
+          "value": 1334
+        },
+        {
+          "name": "coolant.temp",
+          "value": 358.65,
+          "unit": "K"
+        },
+        {
+          "name": "engine.load",
+          "value": 27.5,
+          "unit": "%"
+        },
+        {
+          "name": "fuel.level",
+          "value": 61.5,
+          "unit": "%"
+        },
+        {
+          "name": "hv.temp",
+          "value": 26.3,
+          "unit": "C"
+        },
+        {
+          "name": "hv.charging",
+          "value": 0
+        },
+        {
+          "name": "lv.voltage",
+          "value": 13.89,
+          "unit": "V"
+        },
+        {
+          "name": "tpms.min",
+          "value": 236.4,
+          "unit": "kPa"
+        }
+      ]
+    },
+    {
+      "vin": "STLDRX6D8SE000004",
+      "t": 1790000001.000,
+      "n": 17900000002,
+      "signals": [
+        {
+          "name": "gps.lat",
+          "value": 13.110759
+        },
+        {
+          "name": "gps.lon",
+          "value": 80.294435
+        },
+        {
+          "name": "gps.heading",
+          "value": 217
+        },
+        {
+          "name": "speed",
+          "value": 14.278,
+          "unit": "m/s"
+        },
+        {
+          "name": "accel.long",
+          "value": 0.11,
+          "unit": "m/s2"
+        },
+        {
+          "name": "odometer",
+          "value": 177313310,
+          "unit": "m"
+        },
+        {
+          "name": "ignition",
+          "value": 1
+        },
+        {
+          "name": "rpm",
+          "value": 2196
+        },
+        {
+          "name": "coolant.temp",
+          "value": 360.85,
+          "unit": "K"
+        },
+        {
+          "name": "engine.load",
+          "value": 42.0,
+          "unit": "%"
+        },
+        {
+          "name": "fuel.level",
+          "value": 62.9,
+          "unit": "%"
+        },
+        {
+          "name": "lv.voltage",
+          "value": 14.05,
+          "unit": "V"
+        },
+        {
+          "name": "tpms.min",
+          "value": 234.2,
+          "unit": "kPa"
+        }
+      ]
+    }
+  ]
+}
