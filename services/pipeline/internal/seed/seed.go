@@ -99,8 +99,11 @@ func Postgres(ctx context.Context, pool *pgxpool.Pool, w *sim.World, o Options, 
 	if err := history(ctx, pool, w, o, log); err != nil {
 		return fmt.Errorf("history: %w", err)
 	}
-	if _, err := pool.Exec(ctx, `ANALYZE`); err != nil {
-		return err
+	// Populate read models and set visibility maps so index-only scans work.
+	for _, stmt := range []string{`SELECT refresh_vehicle_risk()`, `SELECT refresh_read_models()`, `VACUUM (ANALYZE)`} {
+		if _, err := pool.Exec(ctx, stmt); err != nil {
+			return fmt.Errorf("%s: %w", stmt, err)
+		}
 	}
 	log.Info("postgres seed complete", "elapsed", time.Since(start).Round(time.Second))
 	return nil
