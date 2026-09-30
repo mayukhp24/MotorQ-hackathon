@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 
-from app.api.deps import get_ctx, require
+from app.api.deps import get_ctx, platform_principal, require
 from app.api.schemas import ErasureRequest
 from app.context import AppContext
 from app.domain.pagination import clamp_limit
@@ -59,7 +59,7 @@ async def erasures(limit: int = Query(50, ge=1, le=200), p: Principal = Depends(
 
 
 @router.get("/admin/tenants", tags=["admin"], summary="Tenants overview (platform operators)")
-async def tenants(p: Principal = Depends(require(rbac.PLATFORM_ADMIN))) -> dict:
+async def tenants(p: Principal = Depends(platform_principal)) -> dict:
     async with db.tenant_tx(None) as conn:
         return {"items": db.rows(await conn.fetch("SELECT * FROM platform_tenant_overview()"))}
 

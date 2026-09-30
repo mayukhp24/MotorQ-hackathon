@@ -1,0 +1,142 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Design tokens. Series and status colours are the validated reference
+   palette (CVD-checked per mode); dark values are selected steps, not an
+   automatic inversion. Components reference roles, never raw hex. */
+:root {
+  color-scheme: light;
+  --surface-0: #f3f3f0;
+  --surface-1: #fcfcfb;
+  --surface-2: #efeee9;
+  --surface-3: #ffffff;
+  --border: #e2e1db;
+  --text-primary: #0b0b0b;
+  --text-secondary: #52514e;
+  --text-muted: #77766f;
+  --accent: #2a78d6;
+  --accent-soft: #e4eefb;
+  --accent-ink: #184f95;
+  --grid: #e9e8e3;
+  --axis: #8d8c86;
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --series-3: #1baf7a;
+  --series-4: #eda100;
+  --series-5: #e87ba4;
+  --series-6: #008300;
+  --series-7: #4a3aa7;
+  --series-8: #e34948;
+  --seq-100: #cde2fb;
+  --seq-300: #6da7ec;
+  --seq-500: #256abf;
+  --seq-700: #0d366b;
+  --status-good: #0ca30c;
+  --status-warning: #fab219;
+  --status-serious: #ec835a;
+  --status-critical: #d03b3b;
+  --neutral-mark: #a3a29b;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --surface-0: #111110;
+    --surface-1: #1a1a19;
+    --surface-2: #242422;
+    --surface-3: #161615;
+    --border: #2e2e2b;
+    --text-primary: #ffffff;
+    --text-secondary: #c3c2b7;
+    --text-muted: #8f8e86;
+    --accent: #3987e5;
+    --accent-soft: #1a2a3f;
+    --accent-ink: #9ec5f4;
+    --grid: #2a2a28;
+    --axis: #75746d;
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    --series-3: #199e70;
+    --series-4: #c98500;
+    --series-5: #d55181;
+    --series-6: #008300;
+    --series-7: #9085e9;
+    --series-8: #e66767;
+    --seq-100: #104281;
+    --seq-300: #256abf;
+    --seq-500: #5598e7;
+    --seq-700: #b7d3f6;
+    --neutral-mark: #6b6a64;
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --surface-0: #111110;
+  --surface-1: #1a1a19;
+  --surface-2: #242422;
+  --surface-3: #161615;
+  --border: #2e2e2b;
+  --text-primary: #ffffff;
+  --text-secondary: #c3c2b7;
+  --text-muted: #8f8e86;
+  --accent: #3987e5;
+  --accent-soft: #1a2a3f;
+  --accent-ink: #9ec5f4;
+  --grid: #2a2a28;
+  --axis: #75746d;
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  --series-3: #199e70;
+  --series-4: #c98500;
+  --series-5: #d55181;
+  --series-6: #008300;
+  --series-7: #9085e9;
+  --series-8: #e66767;
+  --seq-100: #104281;
+  --seq-300: #256abf;
+  --seq-500: #5598e7;
+  --seq-700: #b7d3f6;
+  --neutral-mark: #6b6a64;
+}
+
+html, body, #root { height: 100%; }
+body {
+  background: var(--surface-0);
+  color: var(--text-primary);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "tnum" 1, "cv11" 1;
+  -webkit-font-smoothing: antialiased;
+}
+
+@layer components {
+  .card { @apply rounded-xl border border-line bg-surface-1 shadow-card; }
+  .card-pad { @apply p-4 sm:p-5; }
+  .btn { @apply inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent; }
+  .btn-primary { @apply btn bg-accent text-white hover:brightness-110; }
+  .btn-ghost { @apply btn text-ink-2 hover:bg-surface-2 hover:text-ink-1; }
+  .btn-outline { @apply btn border border-line text-ink-1 hover:bg-surface-2; }
+  .input { @apply w-full rounded-lg border border-line bg-surface-1 px-3 py-2 text-sm text-ink-1 placeholder:text-ink-3 focus:outline-none focus:ring-2 focus:ring-accent; }
+  .label { @apply text-xs font-medium uppercase tracking-wide text-ink-3; }
+  .th { @apply px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-ink-3; }
+  .td { @apply px-3 py-2.5 text-sm text-ink-1 align-middle; }
+  .mono { @apply font-mono text-[12.5px]; }
+}
+
+.leaflet-container { background: var(--surface-2) !important; font-family: inherit; }
+.leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface-1) !important; color: var(--text-primary) !important; }
+.leaflet-control-attribution { background: color-mix(in srgb, var(--surface-1) 80%, transparent) !important; color: var(--text-muted) !important; }
+.leaflet-control-attribution a { color: var(--text-secondary) !important; }
+
+.recharts-cartesian-axis-tick-value { fill: var(--text-muted); font-size: 11px; }
+.recharts-tooltip-cursor { fill: var(--surface-2); }
+
+.markdown p { margin: 0.35rem 0; }
+.markdown ul { list-style: disc; padding-left: 1.2rem; margin: 0.35rem 0; }
+.markdown li { margin: 0.15rem 0; }
+.markdown code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; background: var(--surface-2); padding: 0 4px; border-radius: 4px; }
+.markdown strong { font-weight: 600; }
+
+@keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.live-dot { animation: pulse-dot 1.6s ease-in-out infinite; }

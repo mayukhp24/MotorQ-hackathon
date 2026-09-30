@@ -43,13 +43,25 @@ def principal_from_token(ctx: AppContext, token: str, tenant_override: str | Non
 
 
 async def current_principal(request: Request, ctx: AppContext = Depends(get_ctx)) -> Principal:
+    return await _authenticate(request, ctx, need_tenant=True)
+
+
+async def platform_principal(request: Request, ctx: AppContext = Depends(get_ctx)) -> Principal:
+    """Platform-operator endpoints: cross-tenant aggregates, no tenant needed."""
+    p = await _authenticate(request, ctx, need_tenant=False)
+    if not p.can(rbac.PLATFORM_ADMIN):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, f"permission '{rbac.PLATFORM_ADMIN}' required")
+    return p
+
+
+async def _authenticate(request: Request, ctx: AppContext, need_tenant: bool) -> Principal:
     auth = request.headers.get("authorization", "")
     if not auth.lower().startswith("bearer "):
         raise _unauthorized("missing bearer token")
     p = principal_from_token(ctx, auth[7:].strip(), request.headers.get("x-tenant-id"))
     if await ctx.redis.exists(f"revoked:{p.token_id}"):
         raise _unauthorized("token revoked")
-    if not p.tenant_id:
+    if need_tenant and not p.tenant_id:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "no tenant selected (platform operators: send X-Tenant-Id)")
     # Per-user rate limit, shared across replicas.
     decision = await ctx.limiter.hit(f"user:{p.user_id}", ctx.settings.rate_limit_per_minute)
