@@ -4,8 +4,9 @@ import {
   ShieldCheck, Sun, Wrench, X,
 } from "lucide-react";
 import { createContext, useContext, useState, type ReactNode } from "react";
-import { NavLink, Outlet } from "react-router-dom";
+import { NavLink, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../lib/auth";
+import ErrorBoundary from "./ErrorBoundary";
 import { useLiveStream } from "../lib/live";
 import { useTheme } from "../lib/theme";
 
@@ -79,6 +80,7 @@ export default function Layout() {
   const { me, logout, can } = useAuth();
   const live = useLiveStream(can("fleet:read"));
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
   return (
     <LiveCtx.Provider value={live}>
       <div className="flex h-full">
@@ -111,7 +113,7 @@ export default function Layout() {
             <button className="btn-ghost px-2" onClick={logout} title="Sign out" aria-label="Sign out"><LogOut className="h-4 w-4" /></button>
           </header>
           <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-            <div className="mx-auto max-w-[1400px]"><Outlet /></div>
+            <div className="mx-auto max-w-[1400px]"><ErrorBoundary key={pathname}><Outlet /></ErrorBoundary></div>
           </main>
         </div>
       </div>

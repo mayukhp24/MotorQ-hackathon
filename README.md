@@ -103,18 +103,20 @@ model names change, so check the provider's list):
 
 | Provider | `LLM_BASE_URL` | `LLM_MODEL` (example) | `LLM_API_KEY` |
 |---|---|---|---|
-| Groq (free tier) | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | your Groq key |
+| Groq (free tier) | `https://api.groq.com/openai/v1` | `openai/gpt-oss-120b` | your Groq key |
 | Google Gemini (free tier) | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.0-flash` | your Gemini key |
 | OpenRouter (free models) | `https://openrouter.ai/api/v1` | a tool-capable model ending in `:free` | your OpenRouter key |
 | Ollama (local, no key) | `http://host.docker.internal:11434/v1` | `qwen2.5:7b` | – |
 
 ```bash
-LLM_BASE_URL=https://api.groq.com/openai/v1 LLM_API_KEY=... LLM_MODEL=llama-3.3-70b-versatile \
+LLM_BASE_URL=https://api.groq.com/openai/v1 LLM_API_KEY=... LLM_MODEL=openai/gpt-oss-120b \
   docker compose up -d fleet-api
 ```
 
 The API logs `copilot mode: llm (openai)` on start, and the copilot shows which
-model answered. Provider errors or rate limits fall back to the offline planner.
+model answered. Provider errors, rate limits or an unusable reply fall back to the
+offline planner. Some open models write tool calls into the reply text
+(`<function=name>{...}</function>`); the copilot recognises and runs those too.
 Claude also works (`ANTHROPIC_API_KEY`, used when `LLM_BASE_URL` is empty).
 Behind a TLS-inspecting proxy, build with `EXTRA_CA_FILE=/path/to/ca.pem`.
 
@@ -123,9 +125,9 @@ Behind a TLS-inspecting proxy, build with `EXTRA_CA_FILE=/path/to/ca.pem`.
 | Suite | Command | Result |
 |---|---|---|
 | Go unit + contract | `cd services/pipeline && go test -race ./...` | 84 tests, 84.3% coverage |
-| API unit + Testcontainers integration | `cd services/fleet-api && pip install -e ".[test]" && pytest --cov=app` | 64 tests, 88% |
+| API unit + Testcontainers integration | `cd services/fleet-api && pip install -e ".[test]" && pytest --cov=app` | 80 tests, 88% |
 | Analytics unit + Testcontainers | `cd services/analytics && pip install -e ".[test]" && pytest --cov=analytics` | 16 tests, 90% |
-| Web | `cd services/web && npm ci && npm test` | 14 tests |
+| Web | `cd services/web && npm ci && npm test` | 16 tests |
 | BDD acceptance (stack running) | `cd tests/bdd && behave features` | 9 scenarios pass |
 | Load | `k6 run -e BASE_URL=http://localhost:8000 tests/load/api.js` | 100 req/s: p95 135 ms, p99 408 ms, 0 errors |
 | Chaos | `python tests/chaos/chaos.py` | 5/5 experiments pass |

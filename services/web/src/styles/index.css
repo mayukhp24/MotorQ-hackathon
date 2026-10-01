@@ -128,6 +128,7 @@ body {
 .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: var(--surface-1) !important; color: var(--text-primary) !important; }
 .leaflet-control-attribution { background: color-mix(in srgb, var(--surface-1) 80%, transparent) !important; color: var(--text-muted) !important; }
 .leaflet-control-attribution a { color: var(--text-secondary) !important; }
+.tiles-dark { filter: invert(1) hue-rotate(180deg) brightness(0.9) contrast(0.85) saturate(0.6); }
 
 .recharts-cartesian-axis-tick-value { fill: var(--text-muted); font-size: 11px; }
 .recharts-tooltip-cursor { fill: var(--surface-2); }
@@ -137,6 +138,13 @@ body {
 .markdown li { margin: 0.15rem 0; }
 .markdown code { font-family: "JetBrains Mono", ui-monospace, monospace; font-size: 12px; background: var(--surface-2); padding: 0 4px; border-radius: 4px; }
 .markdown strong { font-weight: 600; }
+.markdown ol { list-style: decimal; padding-left: 1.4rem; margin: 0.35rem 0; }
+.markdown h1, .markdown h2, .markdown h3, .markdown h4 { font-weight: 600; margin: 0.6rem 0 0.25rem; }
+.markdown pre { background: var(--surface-2); border-radius: 6px; padding: 8px 10px; overflow-x: auto; margin: 0.35rem 0; }
+.markdown pre code { padding: 0; background: none; }
+.markdown table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; margin: 0.5rem 0; font-size: 13px; }
+.markdown th, .markdown td { border: 1px solid var(--border); padding: 4px 10px; text-align: left; white-space: nowrap; }
+.markdown th { background: var(--surface-2); font-weight: 600; }
 
 @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
 .live-dot { animation: pulse-dot 1.6s ease-in-out infinite; }

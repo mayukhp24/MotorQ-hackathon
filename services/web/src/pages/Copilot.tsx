@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Bot, Check, Send, ShieldAlert, User, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import { api } from "../api/client";
+import ErrorBoundary from "../components/ErrorBoundary";
 import { Card, Empty, ErrorNote, PageHeader } from "../components/ui";
 import { useAuth } from "../lib/auth";
 import { fmtAgo } from "../lib/format";
@@ -88,7 +90,11 @@ function Bubble({ m }: { m: Msg }) {
           <div className="flex gap-3">
             <div className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent-soft"><Icon className="h-4 w-4 text-accent-ink" /></div>
             <div className="min-w-0">
-              <div className="markdown text-sm leading-relaxed text-ink-1"><ReactMarkdown>{m.text}</ReactMarkdown></div>
+              <div className="markdown text-sm leading-relaxed text-ink-1">
+                <ErrorBoundary fallback={<p className="whitespace-pre-wrap">{String(m.text ?? "")}</p>}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{String(m.text ?? "")}</ReactMarkdown>
+                </ErrorBoundary>
+              </div>
               {m.turn && (
                 <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-ink-3">
                   {m.turn.tool_calls.map((t, i) => (

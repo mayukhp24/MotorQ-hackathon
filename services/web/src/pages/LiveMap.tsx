@@ -64,7 +64,10 @@ export default function LiveMap() {
     [resolved]);
   const maxCount = Math.max(1, ...(cells.data?.cells ?? []).map((c) => c.count));
   const total = (cells.data?.cells ?? []).reduce((a, c) => a + c.count, 0);
-  const tileUrl = `https://{s}.basemaps.cartocdn.com/${resolved === "dark" ? "dark_all" : "light_all"}/{z}/{x}/{y}{r}.png`;
+  // Keyless OpenStreetMap tiles (CARTO's free basemaps need an API key since Sep 2026); dark mode
+  // inverts them in CSS. OSM requires a Referer, so tiles send the origin even though the page's
+  // policy is no-referrer.
+  const tileUrl = "https://tile.openstreetmap.org/{z}/{x}/{y}.png";
 
   return (
     <>
@@ -77,7 +80,9 @@ export default function LiveMap() {
           <MapContainer center={[20.6, 78.9]} zoom={5} minZoom={4} maxZoom={16} className="h-full w-full" preferCanvas
             whenReady={() => undefined}>
             <GeoJSON key={resolved} data={india} style={{ color: colors.axis, weight: 1, fillColor: colors.surface1, fillOpacity: 0.6 }} />
-            {tiles === "on" && <TileLayer key={tileUrl} url={tileUrl} attribution='&copy; OpenStreetMap contributors &copy; CARTO' />}
+            {tiles === "on" && <TileLayer key={resolved} url={tileUrl} maxZoom={19} referrerPolicy="strict-origin-when-cross-origin"
+              className={resolved === "dark" ? "tiles-dark" : undefined}
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors' />}
             <Viewport onChange={(z, b) => { setZoom(z); setBounds(b); }} />
             {!detail && (cells.data?.cells ?? []).map((c) => (
               <CircleMarker key={c.geohash} center={[c.lat, c.lon]} radius={6 + Math.sqrt(c.count / maxCount) * 26}

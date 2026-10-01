@@ -86,6 +86,41 @@ def resolve_provider(s: Any) -> str:
     return p if p in ("openai", "anthropic") else "offline"
 
 
+_TEXT_CALL = re.compile(r"<function[=/]\s*([A-Za-z_]\w*)\s*>?\s*(\{.*?\})\s*(?:</?function>|$)", re.S)
+_MARKUP = re.compile(r"<\|[a-z_]+\|>|</?function[^>]*>")
+
+
+def text_tool_calls(text: str, known: set[str]) -> tuple[list[dict[str, Any]], str]:
+    """Some open models (Llama on Groq, for one) write tool calls into the message
+    text, as <function=name>{json}</function> or a bare {"name", "parameters"}
+    object, instead of returning tool_calls. Returns them in tool_calls form plus
+    the remaining text; names that are not offered tools are left as text."""
+    calls: list[dict[str, Any]] = []
+
+    def take(name: str, args: Any) -> bool:
+        if name not in known or not isinstance(args, dict):
+            return False
+        calls.append({"type": "function", "function": {"name": name, "arguments": json.dumps(args)}})
+        return True
+
+    def tagged(m: re.Match[str]) -> str:
+        try:
+            return "" if take(m.group(1), json.loads(m.group(2))) else m.group(0)
+        except ValueError:
+            return m.group(0)
+
+    rest = _TEXT_CALL.sub(tagged, text)
+    bare = rest.replace("<|python_tag|>", "").strip()
+    if not calls and bare.startswith("{"):
+        try:
+            obj = json.loads(bare)
+        except ValueError:
+            obj = None
+        if isinstance(obj, dict) and take(str(obj.get("name", "")), obj.get("parameters", obj.get("arguments"))):
+            rest = ""
+    return calls, rest.strip()
+
+
 class Copilot:
     def __init__(self, ctx: AppContext) -> None:
         self.ctx = ctx
@@ -262,6 +297,7 @@ class Copilot:
         tools = [{"type": "function", "function": {"name": d["name"], "description": d["description"],
                                                    "parameters": d["input_schema"]}}
                  for d in (t.definition() for t in available_tools(tc.principal))]
+        tool_names = {t["function"]["name"] for t in tools}
         messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}, *history,
                                           {"role": "user", "content": message}]
         out = TurnResult("", "", "llm")
@@ -285,7 +321,9 @@ class Copilot:
             text = (msg.get("content") or "").strip()
             calls = msg.get("tool_calls") or []
             if not calls:
-                answer = text or answer
+                calls, text = text_tool_calls(text, tool_names)
+            if not calls:
+                answer = _MARKUP.sub("", _TEXT_CALL.sub("", text)).strip() or answer
                 if finish == "length":
                     out.warnings.append("answer truncated")
                 elif finish == "content_filter":
@@ -296,7 +334,7 @@ class Copilot:
             for i, c in enumerate(calls):
                 c["id"] = c.get("id") or f"call_{usage['calls']}_{i}"
                 c.setdefault("type", "function")
-            messages.append({"role": "assistant", "content": msg.get("content"), "tool_calls": calls})
+            messages.append({"role": "assistant", "content": text or None, "tool_calls": calls})
             parsed: list[tuple[str, str, dict[str, Any] | None]] = []
             for c in calls:
                 fn = c.get("function") or {}
@@ -318,6 +356,8 @@ class Copilot:
             for b in await self._exec_tools(tc, valid, out):
                 messages.append({"role": "tool", "tool_call_id": b["tool_use_id"],
                                  "content": ("error: " if b["is_error"] else "") + b["content"]})
+        if not answer:  # no usable answer (endless tool calls, empty or markup-only text): answer offline
+            raise LLMError("model returned no answer")
         return self._finish(out, answer, usage)
 
     # ----------------------------------------------------- offline planner

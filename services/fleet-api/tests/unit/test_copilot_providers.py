@@ -170,3 +170,71 @@ async def test_provider_error_falls_back_to_offline_planner(monkeypatch, fake_to
     assert out.mode == "offline" and out.answer == "offline answer"
     assert any("offline planner" in w for w in out.warnings)
     assert len(seen) == 1
+
+
+KNOWN = {"list_at_risk_vehicles", "get_fleet_summary"}
+
+
+@pytest.mark.parametrize("text,name,args,rest", [
+    ('<function=list_at_risk_vehicles>{"min_risk": 0.3}</function>', "list_at_risk_vehicles", {"min_risk": 0.3}, ""),
+    ('Checking.<function=get_fleet_summary>{}</function>', "get_fleet_summary", {}, "Checking."),
+    ('<function=list_at_risk_vehicles>{"limit": 5}<function>', "list_at_risk_vehicles", {"limit": 5}, ""),
+    ('<function/get_fleet_summary>{"a": {"b": 1}}</function>', "get_fleet_summary", {"a": {"b": 1}}, ""),
+    ('<function=list_at_risk_vehicles{"limit": 2}</function>', "list_at_risk_vehicles", {"limit": 2}, ""),
+    ('<|python_tag|>{"name": "get_fleet_summary", "parameters": {}}', "get_fleet_summary", {}, ""),
+    ('{"type": "function", "name": "list_at_risk_vehicles", "parameters": {"limit": 1}}',
+     "list_at_risk_vehicles", {"limit": 1}, ""),
+])
+def test_text_tool_calls_are_recovered(text, name, args, rest):
+    calls, remaining = cp.text_tool_calls(text, KNOWN)
+    assert [(c["function"]["name"], json.loads(c["function"]["arguments"])) for c in calls] == [(name, args)]
+    assert remaining == rest
+
+
+@pytest.mark.parametrize("text", [
+    "Plain answer with {braces} in it.",
+    '<function=drop_tables>{"all": true}</function>',      # not an offered tool: stays text
+    '{"name": "get_fleet_summary"}',                       # no arguments object
+    '<function=get_fleet_summary>{not json}</function>',
+])
+def test_text_without_valid_calls_is_left_alone(text):
+    assert cp.text_tool_calls(text, KNOWN) == ([], text)
+
+
+async def test_tool_call_written_as_text_is_executed(fake_tools):
+    s = settings(llm_base_url="https://llm.test/v1")
+    seen: list = []
+    c = make_copilot(s, [
+        reply(content='<function=list_at_risk_vehicles>{"min_risk": 0.5, "limit": 3}</function>'),
+        reply(content=f"`{VIN}` first.<|eot_id|>"),
+    ], seen)
+    out = await c._openai_turn(cp.ToolContext(c.ctx, MAINT, "conv4"), [], "Which vehicles will break down?")
+    assert fake_tools == [("list_at_risk_vehicles", {"min_risk": 0.5, "limit": 3})]
+    assistant, tool = seen[1]["body"]["messages"][-2:]
+    assert assistant["content"] is None and assistant["tool_calls"][0]["id"] == tool["tool_call_id"]
+    assert out.answer == f"`{VIN}` first."                    # leftover special tokens stripped
+
+
+@pytest.mark.parametrize("final", ["", "<function=unknown_tool>{}</function>", "<|eot_id|>"])
+async def test_no_usable_answer_falls_back_offline(monkeypatch, fake_tools, final):
+    c = make_copilot(settings(llm_base_url="https://llm.test/v1"), [reply(content=final)], [])
+
+    async def offline(tc, message):
+        return cp.TurnResult("", "offline answer", "offline", warnings=["Answered by the offline planner."])
+
+    monkeypatch.setattr(c, "_offline_turn", offline)
+    out = await c.chat(MAINT, "Which vehicles will break down?", None, "req-2")
+    assert out.mode == "offline" and out.answer == "offline answer"
+
+
+async def test_endless_tool_calls_fall_back_offline(monkeypatch, fake_tools):
+    s = settings(llm_base_url="https://llm.test/v1", llm_max_tool_calls=1)
+    loop = [reply(calls=[tool_call(f"c{i}", "list_at_risk_vehicles", {})]) for i in range(3)]
+    c = make_copilot(s, loop, [])
+
+    async def offline(tc, message):
+        return cp.TurnResult("", "offline answer", "offline")
+
+    monkeypatch.setattr(c, "_offline_turn", offline)
+    out = await c.chat(MAINT, "rank", None, "req-3")
+    assert out.mode == "offline"

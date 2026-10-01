@@ -78,5 +78,7 @@ Machine-readable SBOMs (CycloneDX) are produced per container image by the CI
 | react-leaflet | Hippocratic-2.1 (ethical-use licence; review before commercial distribution) |
 | lucide-react, topojson-client, world-atlas | ISC |
 
-Map tiles in the live map are loaded from CARTO basemaps (© OpenStreetMap
-contributors, © CARTO), attributed in the UI.
+Map tiles in the live map are loaded from the OpenStreetMap tile servers
+(© OpenStreetMap contributors, ODbL), attributed in the UI; fine for a demo
+under the OSM tile usage policy, a production deployment would use a paid or
+self-hosted tile service. The "Outline only" view needs no tile server.
