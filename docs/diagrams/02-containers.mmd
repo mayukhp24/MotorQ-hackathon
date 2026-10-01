@@ -1,0 +1,19 @@
+flowchart TB
+  OEM[OEM clouds / simulator] -->|MQTT QoS1<br/>shared subscription| MQ[(Mosquitto / EMQX)]
+  OEM -->|HTTPS batch POST| GW
+  MQ -->|MQTT| GW[ingest-gateway<br/>Go]
+  GW -->|Kafka telemetry.v1<br/>key = VIN| K[(Kafka)]
+  GW -->|Kafka telemetry.dlq.v1| K
+  K -->|consumer group| SP[stream-processor<br/>Go, N replicas]
+  SP -->|telemetry.enriched.v1| K
+  SP -->|alerts.v1, trips.v1| K
+  SP -->|HASH / GEO / pub-sub| R[(Redis<br/>live state)]
+  K -->|Kafka engine| CH[(ClickHouse<br/>telemetry OLAP)]
+  K -->|consumer group| SW[sink-writer<br/>Go] -->|COPY / upsert| PG[(PostgreSQL 16<br/>+ pgvector)]
+  AJ[analytics jobs<br/>Python] -->|features SQL, Parquet| CH
+  AJ -->|risk scores, KB embeddings| PG
+  API[fleet-api<br/>FastAPI] -->|asyncpg, RLS| PG
+  API -->|HTTP, row policy| CH
+  API -->|live state, rate limits, cache| R
+  API -->|Messages API + tools| LLM[Claude API]
+  WEB[web<br/>React + nginx] -->|HTTPS / WSS /api| API

@@ -29,8 +29,9 @@ flowchart LR
 ## Authentication and authorisation
 
 * **OAuth2 password grant** issuing RS256 JWTs (`/api/v1/auth/token`), with
-  `/.well-known/openid-configuration` and JWKS so an external OIDC provider
-  can replace the built-in issuer (the API only needs `JWKS_URL`).
+  `/.well-known/openid-configuration` and a JWKS endpoint so other services
+  can verify FleetPulse tokens. Federating with an external OIDC identity
+  provider (validating its tokens against its JWKS) is a planned extension.
 * **RBAC:** five roles mapped to fourteen fine-grained permissions
   (`app/security/rbac.py`): platform admin, fleet admin, maintenance manager,
   analyst, viewer. Endpoints declare the permission they need; the UI hides

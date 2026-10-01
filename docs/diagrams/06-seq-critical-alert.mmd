@@ -1,0 +1,23 @@
+sequenceDiagram
+  autonumber
+  participant V as OEM cloud
+  participant GW as Gateway
+  participant K as Kafka
+  participant SP as Processor
+  participant R as Redis
+  participant API as API
+  participant UI as Browser
+  participant PG as Postgres
+  V->>GW: POST batch
+  GW->>GW: decode, validate
+  GW->>K: telemetry.v1 (key VIN)
+  K-->>GW: ack (all ISR)
+  GW-->>V: 202
+  K->>SP: poll
+  SP->>SP: dedup, 15 s hold
+  SP->>K: alerts.v1
+  SP->>R: PUBLISH
+  R-->>API: pub/sub
+  API-->>UI: WebSocket alert
+  K->>PG: sink-writer upsert
+  Note over V,PG: measured 0.02–0.54 s to API, p95 480 ms (target < 5 s)

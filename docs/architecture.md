@@ -86,6 +86,73 @@ at ~4K events/s; benchmark figures from `docs/evidence/pipeline-benchmarks.txt`.
 
 Ingest-to-processed p95 is 239 ms (`processor_ingest_to_process_seconds`).
 
+### Critical flow: overheating vehicle to manager's screen
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant V as OEM cloud
+  participant GW as Gateway
+  participant K as Kafka
+  participant SP as Processor
+  participant R as Redis
+  participant API as API
+  participant UI as Browser
+  participant PG as Postgres
+  V->>GW: POST batch
+  GW->>GW: decode, validate
+  GW->>K: telemetry.v1 (key VIN)
+  K-->>GW: ack (all ISR)
+  GW-->>V: 202
+  K->>SP: poll
+  SP->>SP: dedup, 15 s hold
+  SP->>K: alerts.v1
+  SP->>R: PUBLISH
+  R-->>API: pub/sub
+  API-->>UI: WebSocket alert
+  K->>PG: sink-writer upsert
+  Note over V,PG: measured 0.02–0.54 s to API, p95 480 ms (target < 5 s)
+```
+
+### Failure path: Kafka unavailable, OEM retries, duplicates
+
+```mermaid
+sequenceDiagram
+  autonumber
+  participant O as OEM cloud
+  participant GW as Gateway
+  participant K as Kafka
+  participant SP as Processor
+  participant PG as Postgres
+  Note over K: broker down (20 s)
+  O->>GW: POST batch A
+  GW->>K: produce (buffered)
+  Note over GW: held until acked
+  O->>GW: POST batch B
+  GW-->>O: 429 Retry-After 1
+  Note over K: broker back
+  K-->>GW: ack batch A
+  GW-->>O: 202 (batch A)
+  alt delivery timed out
+    GW-->>O: 503, OEM retries
+  end
+  O->>GW: retry batch B (same seq)
+  GW->>K: produce
+  K->>SP: A, B, retried copies
+  SP->>SP: Bloom dedup by event_id
+  SP->>K: alerts (deterministic IDs)
+  K->>PG: upsert: replays are no-ops
+  Note over O,PG: measured: alert sent in the outage arrived after 30.6 s, no loss
+```
+
+The gateway never acknowledges a batch before Kafka has it (`acks=all`); above
+the producer's high-water mark it answers 429 with `Retry-After`, and if
+delivery times out it answers 503. Either way the OEM retries, the retried
+records carry the same `(OEM, VIN, sequence)` and therefore the same
+`event_id`, the processor's Bloom filter drops them, and any alert derived
+twice has the same deterministic ID, so the PostgreSQL upsert is a no-op.
+Rendered diagrams: `docs/diagrams/*.png`.
+
 ## 4. Data architecture (polyglot persistence)
 
 | Store | Data | Why this store | CAP choice |

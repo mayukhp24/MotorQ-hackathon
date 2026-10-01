@@ -1,0 +1,22 @@
+flowchart TB
+  subgraph Cloud["Cloud account (AWS example: infra/terraform/aws)"]
+    subgraph VPC["VPC, 3 AZs"]
+      subgraph EKS["EKS (namespace fleetpulse)"]
+        ING[ingress-nginx + cert-manager] --> WEBD[web x2]
+        ING --> APID[fleet-api x3..20 HPA]
+        ING -->|client-cert host| GWD[ingest-gateway x3..24 HPA]
+        GWD --> SPD[stream-processor x6..48 KEDA]
+        SWD[sink-writer x2]
+        CJ[analytics CronJobs]
+        CHO[ClickHouse operator<br/>olap node group]
+        ESO[External Secrets Operator]
+      end
+      MSK[(MSK Kafka x3<br/>SASL/SCRAM + TLS)]
+      RDS[(RDS PostgreSQL<br/>Multi-AZ)]
+      EC[(ElastiCache Redis<br/>TLS + AUTH)]
+    end
+    S3[(S3 cold tier)]
+    SMGR[Secrets Manager + KMS]
+  end
+  ESO --> SMGR
+  CHO --> S3

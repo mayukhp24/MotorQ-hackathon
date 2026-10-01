@@ -1,0 +1,22 @@
+flowchart LR
+  subgraph Users
+    FM[Fleet manager / maintenance lead]
+    AN[Analyst / viewer]
+    PO[Platform operator]
+  end
+  subgraph OEMs["OEM clouds (3 formats)"]
+    A[Aurora Motors<br/>nested JSON, metric, epoch ms]
+    P[Pinnacle Auto<br/>flat JSON, imperial, ISO-8601]
+    S[Stellar EV<br/>signal list, Kelvin, m/s]
+  end
+  FP((FleetPulse))
+  IDP[Identity provider<br/>OIDC, optional]
+  LLM[Claude API<br/>copilot reasoning]
+  SM[Cloud secret manager]
+  A -- MQTT/TLS (mTLS) --> FP
+  P -- HTTPS push (API key + client cert) --> FP
+  S -- MQTT/TLS (mTLS) --> FP
+  FM & AN & PO -- HTTPS / WSS --> FP
+  FP -- OIDC / JWKS --> IDP
+  FP -- HTTPS tool-use loop --> LLM
+  FP -- IRSA / workload identity --> SM

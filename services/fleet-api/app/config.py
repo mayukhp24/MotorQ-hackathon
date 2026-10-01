@@ -19,9 +19,10 @@ class Settings(BaseSettings):
     clickhouse_password: str = "clickhouse-ro-local-only"
     clickhouse_timeout_s: float = 8.0
 
-    # Identity: RS256 JWTs. In production the private key is injected from the
-    # secret store (or an external OIDC provider issues tokens and only
-    # JWKS_URL is configured); locally a key is generated and shared via Redis.
+    # Identity: RS256 JWTs issued by the built-in OAuth2 endpoint and published
+    # via JWKS. In production the private key is injected from the secret store;
+    # locally a key is generated and shared via Redis. (Accepting tokens from an
+    # external OIDC provider is a planned extension.)
     jwt_issuer: str = "https://fleetpulse.local/auth"
     jwt_audience: str = "fleetpulse-api"
     jwt_private_key_pem: str = ""

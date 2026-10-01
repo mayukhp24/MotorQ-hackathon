@@ -1,0 +1,24 @@
+erDiagram
+  plan ||--o{ subscription : "priced by"
+  tenant ||--o{ subscription : has
+  tenant ||--o{ app_user : employs
+  app_user ||--o{ user_role : has
+  role ||--o{ user_role : grants
+  tenant ||--o{ depot : operates
+  depot ||--o{ fleet : "home of"
+  fleet ||--o{ vehicle : contains
+  oem ||--o{ vehicle_model : builds
+  vehicle_model ||--o{ vehicle : "instance of"
+  tenant ||--o{ driver : employs
+  vehicle ||--o{ vehicle_assignment : "driven via"
+  driver ||--o{ vehicle_assignment : "assigned via"
+  vehicle ||--o{ trip : makes
+  vehicle ||--o{ alert : raises
+  vehicle ||--o{ work_order : "serviced by"
+  work_order ||--o{ service_event : records
+  vehicle ||--o{ service_event : undergoes
+  vehicle ||--o{ risk_score : "scored daily"
+  model_version ||--o{ risk_score : produced
+  dtc_code ||--o{ fault_knowledge : "explained by"
+  app_user ||--o{ agent_action : "requests / decides"
+  app_user ||--o{ erasure_request : files

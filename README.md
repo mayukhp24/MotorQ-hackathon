@@ -42,6 +42,8 @@ flowchart LR
   WEB[web · React] -->|HTTPS / WSS| API
 ```
 
+![Container diagram](docs/diagrams/02-containers.png)
+
 Details: [architecture](docs/architecture.md) · [ERD](docs/erd.md) ·
 [ADRs](docs/adr/) · [capacity](docs/capacity.md) ·
 [security & STRIDE](docs/security.md) · [algorithms](docs/algorithms.md) ·

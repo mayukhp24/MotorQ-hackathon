@@ -1,0 +1,26 @@
+sequenceDiagram
+  autonumber
+  participant O as OEM cloud
+  participant GW as Gateway
+  participant K as Kafka
+  participant SP as Processor
+  participant PG as Postgres
+  Note over K: broker down (20 s)
+  O->>GW: POST batch A
+  GW->>K: produce (buffered)
+  Note over GW: held until acked
+  O->>GW: POST batch B
+  GW-->>O: 429 Retry-After 1
+  Note over K: broker back
+  K-->>GW: ack batch A
+  GW-->>O: 202 (batch A)
+  alt delivery timed out
+    GW-->>O: 503, OEM retries
+  end
+  O->>GW: retry batch B (same seq)
+  GW->>K: produce
+  K->>SP: A, B, retried copies
+  SP->>SP: Bloom dedup by event_id
+  SP->>K: alerts (deterministic IDs)
+  K->>PG: upsert: replays are no-ops
+  Note over O,PG: measured: alert sent in the outage arrived after 30.6 s, no loss

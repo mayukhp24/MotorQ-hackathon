@@ -1,0 +1,7 @@
+flowchart TB
+  subgraph stream-processor
+    CMD[cmd/stream-processor<br/>wiring, config, signals] --> APP[processor.Processor<br/>use case: process batch, flush, snapshot]
+    APP --> DOM[detect.Engine, stream.Dedup, trip state machine<br/>pure domain logic]
+    APP --> PORTS[ports: Meta, Output, Live]
+    ADP[adapters.go: Kafka output, Redis live store,<br/>Postgres registry] -. implements .-> PORTS
+  end
