@@ -23,7 +23,7 @@ different format. **Primary user: the fleet maintenance manager.**
 | **Unified ingestion** | MQTT and HTTPS from three OEM formats (nested metric JSON, flat imperial JSON, SI signal lists) mapped by declarative adapters; VIN check digits, range and clock checks; bad records to a DLQ, never the whole batch |
 | **Real-time detection** | 12 sustained-condition rules (overheat, low voltage, EV pack temperature, crash, risky driving, idling…) with dedup, out-of-order handling and trip segmentation; alerts pushed over WebSocket |
 | **Predictive maintenance** | Per-component gradient-boosted models; 7-day breakdown risk with reasons and dollar impact. On held-out data: **precision 0.91 vs 0.41** for today's threshold rules at the same workshop capacity, **$8.3M vs $4.3M** net savings |
-| **Maintenance copilot** | Claude with tenant-scoped tools; answers from live data and *proposes* work orders that a manager approves |
+| **Maintenance copilot** | An LLM with tenant-scoped tools (any OpenAI-compatible model, e.g. a free Groq or Gemini key or a local Ollama, or Claude); answers from live data and *proposes* work orders that a manager approves; works offline without any key |
 | **Trust by design** | OAuth2/JWT, RBAC, row-level security per tenant, location masking and driver pseudonyms, AES-256 PII, hash-chained audit log, right-to-erasure API |
 
 ## Architecture
@@ -38,7 +38,7 @@ flowchart LR
   K --> SW[sink-writer · Go] --> PG[(PostgreSQL + pgvector)]
   AN[analytics · Python] --> CH & PG
   API[fleet-api · FastAPI] --> PG & CH & R
-  API -->|tools| LLM[Claude API]
+  API -->|tools| LLM[LLM API · OpenAI-compatible or Claude]
   WEB[web · React] -->|HTTPS / WSS| API
 ```
 
@@ -94,8 +94,28 @@ Smaller machine? `SIM_VEHICLES=20000 SEED_HISTORY_DAYS=21 docker compose up -d -
 
 All settings are environment variables (12-factor); see
 [`.env.example`](.env.example). Every variable has a local-only default, so no
-`.env` is needed to start. Set `ANTHROPIC_API_KEY` to enable the LLM copilot
-(without it, a deterministic offline planner answers from the same tools).
+`.env` is needed to start.
+
+**Copilot LLM (optional).** Without any key, a deterministic offline planner
+answers from the same tools. To use a model, point the copilot at any
+OpenAI-compatible endpoint (pick a model that supports tool/function calling;
+model names change, so check the provider's list):
+
+| Provider | `LLM_BASE_URL` | `LLM_MODEL` (example) | `LLM_API_KEY` |
+|---|---|---|---|
+| Groq (free tier) | `https://api.groq.com/openai/v1` | `llama-3.3-70b-versatile` | your Groq key |
+| Google Gemini (free tier) | `https://generativelanguage.googleapis.com/v1beta/openai` | `gemini-2.0-flash` | your Gemini key |
+| OpenRouter (free models) | `https://openrouter.ai/api/v1` | a tool-capable model ending in `:free` | your OpenRouter key |
+| Ollama (local, no key) | `http://host.docker.internal:11434/v1` | `qwen2.5:7b` | – |
+
+```bash
+LLM_BASE_URL=https://api.groq.com/openai/v1 LLM_API_KEY=... LLM_MODEL=llama-3.3-70b-versatile \
+  docker compose up -d fleet-api
+```
+
+The API logs `copilot mode: llm (openai)` on start, and the copilot shows which
+model answered. Provider errors or rate limits fall back to the offline planner.
+Claude also works (`ANTHROPIC_API_KEY`, used when `LLM_BASE_URL` is empty).
 Behind a TLS-inspecting proxy, build with `EXTRA_CA_FILE=/path/to/ca.pem`.
 
 ## Tests
@@ -103,7 +123,7 @@ Behind a TLS-inspecting proxy, build with `EXTRA_CA_FILE=/path/to/ca.pem`.
 | Suite | Command | Result |
 |---|---|---|
 | Go unit + contract | `cd services/pipeline && go test -race ./...` | 84 tests, 84.3% coverage |
-| API unit + Testcontainers integration | `cd services/fleet-api && pip install -e ".[test]" && pytest --cov=app` | 51 tests, 87% |
+| API unit + Testcontainers integration | `cd services/fleet-api && pip install -e ".[test]" && pytest --cov=app` | 64 tests, 88% |
 | Analytics unit + Testcontainers | `cd services/analytics && pip install -e ".[test]" && pytest --cov=analytics` | 16 tests, 90% |
 | Web | `cd services/web && npm ci && npm test` | 14 tests |
 | BDD acceptance (stack running) | `cd tests/bdd && behave features` | 9 scenarios pass |
@@ -149,8 +169,9 @@ tests/            BDD, load (k6), chaos
 * The model is trained and evaluated on **synthetic** data; the baseline
   comparison is meaningful, the absolute numbers are not a claim about a real
   fleet.
-* The LLM copilot path was not exercised in the build environment (no API key);
-  the offline planner and all guardrails are tested.
+* The copilot's LLM loop is tested against a mocked and a stand-in OpenAI-compatible
+  server, not a live provider (no key in the build environment); the offline
+  planner and all guardrails are tested.
 * Locally, MQTT uses passwords and ACLs; production uses mTLS (supported by
   the gateway, configured in the Helm chart).
 * `audit_log` is not partitioned yet; PostgreSQL retention jobs (old trip

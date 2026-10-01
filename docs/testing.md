@@ -3,10 +3,10 @@
 | Test type | Tools | Tests | Result | In CI |
 |---|---|---|---|---|
 | Unit – Go pipeline | `go test -race` | 84 tests + 6 benchmarks | pass; **84.3%** statement coverage of pipeline logic (gate 80%; excludes DB/Kafka wiring exercised end to end) | yes |
-| Unit – Fleet API | pytest, fakeredis | 34 | pass | yes |
+| Unit – Fleet API | pytest, fakeredis, httpx mock transport | 47 | pass | yes |
 | Unit – analytics | pytest | 10 | pass | yes |
 | Unit – web | Vitest, Testing Library | 14 | pass | yes |
-| Integration – API | pytest + **Testcontainers** (PostgreSQL 16 + pgvector with every migration, Redis) | 17 (51 API tests in total) | pass; API coverage **87%** (gate 80%) | yes |
+| Integration – API | pytest + **Testcontainers** (PostgreSQL 16 + pgvector with every migration, Redis) | 17 (64 API tests in total) | pass; API coverage **88%** (gate 80%) | yes |
 | Integration – analytics jobs | pytest + Testcontainers (real PostgreSQL, production writer role) | 6 | pass; analytics coverage **90%** (gate 80%) | yes |
 | Contract | Go: producer structs vs JSON Schemas; ClickHouse DDL covers every contract field | 2 suites (3,000 telemetry, 689 alerts, 321 trips validated per run) | pass | yes |
 | Acceptance (BDD) | behave against the running stack | 3 features, 9 scenarios, 32 steps | 9/9 pass; overheat alert visible via API 0.15–0.33 s after the OEM sends it | yes (`e2e` job) |
@@ -43,6 +43,7 @@ the BDD report as artifacts.
 | Audit log tampering | `test_audit_tamper_detection` |
 | Erasure twice | `test_erasure_flow_and_audit_chain` (second request → 409) |
 | Prompt injection, ungrounded VINs, duplicate AI proposals | `test_guardrail_*`, `test_ungrounded_vins`, `test_copilot_offline_*` |
+| LLM provider quirks: missing tool-call IDs, invalid JSON arguments, tool budget, rate limit / outage → offline fallback, write tools hidden from viewers | `tests/unit/test_copilot_providers.py` (mocked OpenAI-compatible server) |
 | Label leakage in ML | `test_labels_look_forward_only`, time-split evaluation |
 | EV cannot fail on cooling/misfire | `test_ev_cannot_fail_on_cooling`, integration scoring test |
 | Simulator rate cap larger than one refill | `TestRunner_RateLimitSustainsTarget` (regression) |

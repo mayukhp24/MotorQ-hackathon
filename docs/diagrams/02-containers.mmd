@@ -15,5 +15,5 @@ flowchart TB
   API[fleet-api<br/>FastAPI] -->|asyncpg, RLS| PG
   API -->|HTTP, row policy| CH
   API -->|live state, rate limits, cache| R
-  API -->|Messages API + tools| LLM[Claude API]
+  API -->|chat + tools| LLM[LLM API]
   WEB[web<br/>React + nginx] -->|HTTPS / WSS /api| API

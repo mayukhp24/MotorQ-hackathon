@@ -15,7 +15,7 @@ project from general, publicly documented OBD-II code meanings.
 | Tool | Used for |
 |---|---|
 | Claude Code (AI coding assistant) | Pair-programming across the repository: code, tests, infrastructure, documentation and this solution document, under the team's direction and review |
-| Claude API (runtime) | The maintenance copilot's reasoning and tool use (optional; the product works without an API key through the offline planner) |
+| LLM API (runtime, optional) | The maintenance copilot's reasoning and tool use: any OpenAI-compatible provider the operator configures (e.g. a free Groq or Gemini tier, or a local Ollama model) or Claude; without one, the offline planner answers |
 
 ## Open-source components
 

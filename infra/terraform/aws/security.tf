@@ -21,8 +21,9 @@ locals {
     "kafka-sasl-password", "clickhouse-password", "clickhouse-ro-password",
     "pii-encryption-key", "cursor-secret", "mqtt-gateway-password",
   ]
-  # Supplied out of band (never in state): JWT signing key, OEM API keys, LLM key.
-  external_secrets = ["jwt-private-key-pem", "ingest-api-keys", "anthropic-api-key"]
+  # Supplied out of band (never in state): JWT signing key, OEM API keys, LLM keys
+  # (put any non-empty placeholder in the LLM key you do not use).
+  external_secrets = ["jwt-private-key-pem", "ingest-api-keys", "llm-api-key", "anthropic-api-key"]
 }
 
 resource "random_password" "app" {

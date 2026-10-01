@@ -85,11 +85,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.ctx = ctx
     ctx.audit.start()
     logging.getLogger("startup").info("fleet-api ready (copilot mode: %s)",
-                                      "llm" if ctx.copilot and ctx.copilot.client else "offline")
+                                      ctx.copilot.mode if ctx.copilot else "offline")
     try:
         yield
     finally:
         await ctx.audit.stop()
+        if ctx.copilot:
+            await ctx.copilot.close()
         await ctx.ch.close()
         await ctx.redis.aclose()
         await ctx.live.aclose()

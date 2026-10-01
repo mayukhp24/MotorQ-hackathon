@@ -55,6 +55,7 @@ secrets:
     - PII_ENCRYPTION_KEY
     - CURSOR_SECRET
     - JWT_PRIVATE_KEY_PEM
+    - LLM_API_KEY
     - INGEST_API_KEYS
     - MQTT_GATEWAY_PASSWORD
     - ANTHROPIC_API_KEY
@@ -113,7 +114,13 @@ sinkWriter:
 fleetApi:
   replicas: 3
   workers: 4
-  llmModel: claude-opus-5-5
+  # Copilot LLM (offline planner when none is configured). Any OpenAI-compatible
+  # endpoint (Groq, Gemini, OpenRouter, a self-hosted vLLM/Ollama) or Claude; the
+  # key comes from the LLM_API_KEY / ANTHROPIC_API_KEY secret entries.
+  llm:
+    provider: auto              # auto | openai | anthropic | offline
+    baseUrl: ""                 # e.g. https://api.groq.com/openai/v1
+    model: claude-opus-5-5      # set to the provider's model id
   corsOrigins: "https://fleetpulse.example.com"
   resources: {requests: {cpu: "1", memory: 1Gi}, limits: {cpu: "2", memory: 2Gi}}
   autoscaling: {enabled: true, minReplicas: 3, maxReplicas: 20, targetCPU: 60}

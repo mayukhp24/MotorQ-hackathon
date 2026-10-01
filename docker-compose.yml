@@ -230,10 +230,16 @@ services:
       CLICKHOUSE_PASSWORD: ${CLICKHOUSE_RO_PASSWORD:-clickhouse-ro-local-only}
       PII_ENCRYPTION_KEY: ${PII_ENCRYPTION_KEY:-local-dev-pii-key-change-me}
       JWT_PRIVATE_KEY_PEM: ${JWT_PRIVATE_KEY_PEM:-}
+      # Copilot LLM (optional; offline planner without one). Any OpenAI-compatible
+      # endpoint, e.g. a free Groq / Gemini / OpenRouter key or a local Ollama:
+      LLM_PROVIDER: ${LLM_PROVIDER:-auto}
+      LLM_BASE_URL: ${LLM_BASE_URL:-}
+      LLM_API_KEY: ${LLM_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       LLM_MODEL: ${LLM_MODEL:-claude-opus-5-5}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:5173}
       WEB_CONCURRENCY: ${API_WORKERS:-4}
+    extra_hosts: ["host.docker.internal:host-gateway"]   # reach a local Ollama on Linux too
     depends_on:
       seed: {condition: service_completed_successfully}
       redis: {condition: service_healthy}

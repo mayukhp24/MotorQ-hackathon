@@ -42,6 +42,7 @@ spec:
             {{- include "fp.secretEnv" (dict "root" . "name" "CURSOR_SECRET") | nindent 12 }}
             {{- include "fp.secretEnv" (dict "root" . "name" "JWT_PRIVATE_KEY_PEM") | nindent 12 }}
             {{- include "fp.secretEnv" (dict "root" . "name" "ANTHROPIC_API_KEY" "optional" true) | nindent 12 }}
+            {{- include "fp.secretEnv" (dict "root" . "name" "LLM_API_KEY" "optional" true) | nindent 12 }}
             - name: DATABASE_URL
               value: {{ include "fp.pgUrl" (dict "root" . "user" "fleetpulse_api" "pwVar" "DB_API_PASSWORD") | quote }}
             - name: REDIS_URL
@@ -51,7 +52,9 @@ spec:
             - {name: CLICKHOUSE_USER, value: fleetpulse_ro}
             - {name: SERVICE_NAME, value: fleet-api}
             - {name: WEB_CONCURRENCY, value: {{ $v.workers | quote }}}
-            - {name: LLM_MODEL, value: {{ $v.llmModel | quote }}}
+            - {name: LLM_PROVIDER, value: {{ $v.llm.provider | quote }}}
+            - {name: LLM_BASE_URL, value: {{ $v.llm.baseUrl | quote }}}
+            - {name: LLM_MODEL, value: {{ $v.llm.model | quote }}}
             - {name: CORS_ORIGINS, value: {{ $v.corsOrigins | quote }}}
             - {name: JWT_ISSUER, value: {{ printf "https://%s/auth" .Values.ingress.host | quote }}}
           livenessProbe:

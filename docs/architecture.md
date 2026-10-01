@@ -20,7 +20,7 @@ flowchart LR
   end
   FP((FleetPulse))
   IDP[Identity provider<br/>OIDC, optional]
-  LLM[Claude API<br/>copilot reasoning]
+  LLM[LLM API<br/>OpenAI-compatible or Claude]
   SM[Cloud secret manager]
   A -- MQTT/TLS (mTLS) --> FP
   P -- HTTPS push (API key + client cert) --> FP
@@ -51,7 +51,7 @@ flowchart LR
   API[fleet-api<br/>FastAPI] -->|asyncpg, RLS| PG
   API -->|HTTP, row policy| CH
   API -->|live state, rate limits, cache| R
-  API -->|Messages API + tools| LLM[Claude API]
+  API -->|chat + tools| LLM[LLM API]
   WEB[web<br/>React + nginx] -->|HTTPS / WSS /api| API
   PROM[Prometheus] -.->|scrape /metrics| GW & SP & SW & API & AJ
   GRAF[Grafana] -.-> PROM
@@ -63,7 +63,7 @@ flowchart LR
 | `stream-processor` | Per-partition state: Bloom-filter dedup, out-of-order handling, 12 detection rules, trip segmentation, idle cost, live state to Redis, KPI snapshots, top-K fault codes | Consumer lag (KEDA) / CPU |
 | `sink-writer` | Alerts and trips from Kafka to PostgreSQL (idempotent, keyed by deterministic IDs) | Partitions of `alerts.v1`/`trips.v1` |
 | ClickHouse Kafka engine | Enriched telemetry to `fleet.telemetry` (ReplacingMergeTree) and rollup MVs | Kafka engine consumers |
-| `fleet-api` | OAuth2/JWT, RBAC, tenant isolation, keyset pagination, rate limits, WebSocket stream, copilot, compliance | CPU (HPA), stateless |
+| `fleet-api` | OAuth2/JWT, RBAC, tenant isolation, keyset pagination, rate limits, WebSocket stream, copilot (any OpenAI-compatible LLM or Claude), compliance | CPU (HPA), stateless |
 | `analytics` | Feature extraction (ClickHouse), training/evaluation, daily scoring, knowledge-base embeddings, read-model refresh | CronJobs |
 | `web` | SPA served by nginx; same-origin proxy to the API | Replicas |
 

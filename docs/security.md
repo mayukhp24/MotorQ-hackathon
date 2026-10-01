@@ -12,7 +12,7 @@ flowchart LR
   K --> SP[stream-processor] --> R[(Redis)]
   U[Browser] -- "TB3: internet, TLS + JWT" --> API[fleet-api]
   API --> PG[(PostgreSQL, RLS)] & CH[(ClickHouse, row policy)] & R
-  API -- "TB4: internet, API key" --> LLM[Claude API]
+  API -- "TB4: internet, API key" --> LLM[LLM API]
 ```
 
 | # | Threat (STRIDE) | Where | Control | Evidence |
@@ -76,7 +76,7 @@ flowchart LR
 | Unintended actions | Write tools create `agent_action` proposals; a maintenance manager approves or rejects in the UI; one pending proposal per vehicle |
 | Hallucinated vehicles | Every VIN in an answer must appear in the question or a tool result; others are replaced with `[unverified VIN]` and a warning |
 | Runaway cost | Tool-call budget per question, bounded `max_tokens`, input length limit (2,000 chars), token usage and estimated cost recorded per answer |
-| Provider outage | Server-side model fallbacks, then a deterministic offline planner that answers from the same tools |
+| Provider outage or rate limit | Any provider error falls back to a deterministic offline planner that answers from the same tools (Claude additionally uses server-side model fallbacks); a circuit breaker stops calling a failing provider |
 | Audit | Question, tools, arguments, proposals, model usage and latency written to the audit chain |
 
 ## Security testing

@@ -5,7 +5,7 @@
 ## Context
 The pipeline must process ~100K events/s with bounded memory and predictable
 latency; the API and analytics need fast iteration, a rich ML ecosystem and
-an official Claude SDK.
+official LLM SDKs (and simple HTTP for OpenAI-compatible endpoints).
 
 ## Options considered
 | Option | For | Against |

@@ -11,7 +11,7 @@ flowchart LR
   end
   FP((FleetPulse))
   IDP[Identity provider<br/>OIDC, optional]
-  LLM[Claude API<br/>copilot reasoning]
+  LLM[LLM API<br/>OpenAI-compatible or Claude]
   SM[Cloud secret manager]
   A -- MQTT/TLS (mTLS) --> FP
   P -- HTTPS push (API key + client cert) --> FP

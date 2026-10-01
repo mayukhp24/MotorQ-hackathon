@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:3000,http://localhost:5173"
 
     # Copilot
+    # Provider "auto" picks an OpenAI-compatible endpoint when LLM_BASE_URL is set
+    # (free tiers of Groq, Google Gemini, OpenRouter, or a local Ollama), else
+    # Claude when ANTHROPIC_API_KEY is set, else the offline planner.
+    llm_provider: str = "auto"  # auto | openai | anthropic | offline
+    llm_base_url: str = ""
+    llm_api_key: str = Field(default="", repr=False)
+    llm_max_output_tokens: int = 2048
     anthropic_api_key: str = Field(default="", repr=False)
     llm_model: str = "claude-opus-5-5"
     # Per-million-token list prices used for the cost estimate shown in the UI.

@@ -1,16 +1,19 @@
-"""Maintenance copilot: a Claude tool-use agent over fleet data.
+"""Maintenance copilot: a tool-use agent over fleet data.
 
-Loop: user question → Claude plans and calls tools (tenant-scoped, RBAC-
-checked, audited) → Claude answers from tool results. Guardrails: input
+Loop: user question → the LLM plans and calls tools (tenant-scoped, RBAC-
+checked, audited) → it answers from tool results. Providers: any
+OpenAI-compatible chat-completions endpoint (free tiers of Groq, Google
+Gemini, OpenRouter, or a local Ollama) or Claude. Guardrails: input
 screening, a tool-call budget, output grounding for VINs, and proposals that
-need human approval. When no API key is configured, the LLM circuit is open
-or the model declines, a deterministic planner answers from the same tools,
-so the feature degrades instead of failing.
+need human approval. When no provider is configured, the provider fails, its
+circuit is open or the model declines, a deterministic planner answers from
+the same tools, so the feature degrades instead of failing.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import re
 import time
@@ -19,6 +22,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 import anthropic
+import httpx
 import orjson
 from prometheus_client import Counter, Histogram
 
@@ -62,13 +66,51 @@ class TurnResult:
     latency_ms: int = 0
 
 
+class LLMError(Exception):
+    """A provider answered with an error or an unusable response."""
+
+
+def resolve_provider(s: Any) -> str:
+    """openai | anthropic | offline, from LLM_PROVIDER (auto by default)."""
+    p = (s.llm_provider or "auto").lower()
+    if p == "auto":
+        if s.llm_base_url:
+            return "openai"
+        return "anthropic" if s.anthropic_api_key else "offline"
+    if p == "openai" and not s.llm_base_url:
+        log.error("LLM_PROVIDER=openai needs LLM_BASE_URL; copilot runs offline")
+        return "offline"
+    if p == "anthropic" and not s.anthropic_api_key:
+        log.error("LLM_PROVIDER=anthropic needs ANTHROPIC_API_KEY; copilot runs offline")
+        return "offline"
+    return p if p in ("openai", "anthropic") else "offline"
+
+
 class Copilot:
     def __init__(self, ctx: AppContext) -> None:
         self.ctx = ctx
         s = ctx.settings
+        self.provider = resolve_provider(s)
+        if self.provider == "openai" and s.llm_model.startswith("claude-"):
+            log.error("LLM_BASE_URL is set but LLM_MODEL is %s; set LLM_MODEL to a model your provider serves. "
+                      "Copilot runs offline.", s.llm_model)
+            self.provider = "offline"
         self.client = anthropic.AsyncAnthropic(api_key=s.anthropic_api_key, timeout=s.llm_timeout_s,
-                                               max_retries=2) if s.anthropic_api_key else None
+                                               max_retries=2) if self.provider == "anthropic" else None
+        self.http: httpx.AsyncClient | None = None
+        if self.provider == "openai":
+            headers = {"Authorization": f"Bearer {s.llm_api_key}"} if s.llm_api_key else {}
+            self.http = httpx.AsyncClient(base_url=s.llm_base_url.rstrip("/"), headers=headers,
+                                          timeout=s.llm_timeout_s)
         self.breaker = CircuitBreaker("llm", failure_threshold=3, reset_timeout_s=60)
+
+    @property
+    def mode(self) -> str:
+        return "offline" if self.provider == "offline" else f"llm ({self.provider})"
+
+    async def close(self) -> None:
+        if self.http is not None:
+            await self.http.aclose()
 
     # ------------------------------------------------------------- history
     async def _load_history(self, conv_id: str, user_id: str) -> list[dict[str, Any]]:
@@ -101,14 +143,15 @@ class Copilot:
         history = await self._load_history(conv_id, p.user_id)
         tc = ToolContext(self.ctx, p, conv_id)
         result: TurnResult | None = None
-        if self.client is not None:
+        turn = {"anthropic": self._llm_turn, "openai": self._openai_turn}.get(self.provider)
+        if turn is not None:
             try:
-                result = await self.breaker.call(lambda: self._llm_turn(tc, history, message))
+                result = await self.breaker.call(lambda: turn(tc, history, message))
             except CircuitOpenError:
                 log.warning("llm circuit open; using offline planner")
-            except anthropic.APIError as e:
-                log.warning("llm call failed; using offline planner: %s", type(e).__name__)
-        if result is None:
+            except (anthropic.APIError, httpx.HTTPError, LLMError, KeyError, ValueError) as e:
+                log.warning("llm call failed; using offline planner: %s: %s", type(e).__name__, str(e)[:200])
+        if result is None:  # the offline planner adds its own "answered offline" warning
             result = await self._offline_turn(tc, message)
         result.conversation_id = conv_id
 
@@ -194,15 +237,88 @@ class Copilot:
             calls_made += len(tool_uses)
             blocks = await self._exec_tools(tc, [(b.id, b.name, dict(b.input)) for b in tool_uses], out)
             messages.append({"role": "user", "content": blocks})
+        return self._finish(out, answer, usage)
+
+    def _finish(self, out: TurnResult, answer: str, usage: dict[str, Any]) -> TurnResult:
+        s = self.ctx.settings
         out.answer = answer or "I couldn't produce an answer from the available data."
         COPILOT_TOKENS.labels("input").inc(usage["input_tokens"])
         COPILOT_TOKENS.labels("output").inc(usage["output_tokens"])
-        # Estimate at list prices (configurable); cached reads are billed lower, so this is an upper bound.
-        usage["est_cost_usd"] = round((usage["input_tokens"] * s.llm_usd_per_mtok_in
-                                       + usage["output_tokens"] * s.llm_usd_per_mtok_out) / 1e6, 5)
+        # Estimate at per-MTok list prices. OpenAI-compatible endpoints are assumed to be free tiers
+        # unless LLM_USD_PER_MTOK_IN/OUT are set; for Claude this is an upper bound (cached reads cost less).
+        price_in, price_out = s.llm_usd_per_mtok_in, s.llm_usd_per_mtok_out
+        if self.provider == "openai" and not {"llm_usd_per_mtok_in", "llm_usd_per_mtok_out"} & s.model_fields_set:
+            price_in = price_out = 0.0
+        usage["est_cost_usd"] = round((usage["input_tokens"] * price_in + usage["output_tokens"] * price_out) / 1e6, 5)
         usage["model"] = s.llm_model
+        usage["provider"] = self.provider
         out.usage = usage
         return out
+
+    async def _openai_turn(self, tc: ToolContext, history: list[dict[str, Any]], message: str) -> TurnResult:
+        """Tool-use loop over an OpenAI-compatible /chat/completions endpoint."""
+        assert self.http is not None
+        s = self.ctx.settings
+        tools = [{"type": "function", "function": {"name": d["name"], "description": d["description"],
+                                                   "parameters": d["input_schema"]}}
+                 for d in (t.definition() for t in available_tools(tc.principal))]
+        messages: list[dict[str, Any]] = [{"role": "system", "content": SYSTEM_PROMPT}, *history,
+                                          {"role": "user", "content": message}]
+        out = TurnResult("", "", "llm")
+        usage = {"input_tokens": 0, "output_tokens": 0, "calls": 0}
+        calls_made = 0
+        answer = ""
+        for _ in range(s.llm_max_tool_calls + 2):
+            r = await self.http.post("/chat/completions", json={
+                "model": s.llm_model, "messages": messages, "tools": tools, "tool_choice": "auto",
+                "max_tokens": s.llm_max_output_tokens, "temperature": 0.2})
+            if r.status_code >= 400:
+                raise LLMError(f"provider returned {r.status_code}: {r.text[:200]}")
+            data = r.json()
+            usage["calls"] += 1
+            u = data.get("usage") or {}
+            usage["input_tokens"] += int(u.get("prompt_tokens") or 0)
+            usage["output_tokens"] += int(u.get("completion_tokens") or 0)
+            choice = data["choices"][0]
+            msg = choice.get("message") or {}
+            finish = choice.get("finish_reason")
+            text = (msg.get("content") or "").strip()
+            calls = msg.get("tool_calls") or []
+            if not calls:
+                answer = text or answer
+                if finish == "length":
+                    out.warnings.append("answer truncated")
+                elif finish == "content_filter":
+                    answer = answer or "I can't help with that request."
+                    out.warnings.append("model declined the request")
+                break
+            # Some providers omit tool-call IDs; every call needs one so its result can be matched.
+            for i, c in enumerate(calls):
+                c["id"] = c.get("id") or f"call_{usage['calls']}_{i}"
+                c.setdefault("type", "function")
+            messages.append({"role": "assistant", "content": msg.get("content"), "tool_calls": calls})
+            parsed: list[tuple[str, str, dict[str, Any] | None]] = []
+            for c in calls:
+                fn = c.get("function") or {}
+                try:
+                    args = json.loads(fn.get("arguments") or "{}")
+                except (TypeError, ValueError):
+                    args = None
+                parsed.append((c["id"], str(fn.get("name", "")), args if isinstance(args, dict) else None))
+            if calls_made + len(calls) > s.llm_max_tool_calls:
+                messages += [{"role": "tool", "tool_call_id": cid, "content":
+                              "Tool budget for this question is exhausted. Answer with the data you already have."}
+                             for cid, _, _ in parsed]
+                out.warnings.append("tool-call budget reached")
+                continue
+            calls_made += len(calls)
+            messages += [{"role": "tool", "tool_call_id": cid, "content": "error: arguments were not valid JSON"}
+                         for cid, _, a in parsed if a is None]
+            valid = [(cid, name, a) for cid, name, a in parsed if a is not None]
+            for b in await self._exec_tools(tc, valid, out):
+                messages.append({"role": "tool", "tool_call_id": b["tool_use_id"],
+                                 "content": ("error: " if b["is_error"] else "") + b["content"]})
+        return self._finish(out, answer, usage)
 
     # ----------------------------------------------------- offline planner
     async def _offline_turn(self, tc: ToolContext, message: str) -> TurnResult:

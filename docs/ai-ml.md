@@ -5,7 +5,7 @@ FleetPulse uses two kinds of AI, each where rules fall short:
 1. **A predictive-maintenance model** that ranks vehicles by the probability
    of a breakdown in the next 7 days, per failure mode, with reasons and a
    dollar impact.
-2. **A maintenance copilot** (Claude with tool use) that answers fleet
+2. **A maintenance copilot** (an LLM with tool use: any OpenAI-compatible model or Claude) that answers fleet
    questions from live, tenant-scoped data and can *propose* (never execute)
    work orders.
 
@@ -96,10 +96,15 @@ calls over the same APIs the UI uses, and can queue a work order for approval.
 
 ### Design
 
-* **Model:** Claude via the Messages API with a manual tool-use loop
-  (`services/fleet-api/app/agent/copilot.py`); model configurable
-  (`LLM_MODEL`, default `claude-opus-5-5`), effort `medium`, server-side
-  model fallbacks enabled, system prompt cached.
+* **Model (provider-agnostic):** a manual tool-use loop
+  (`services/fleet-api/app/agent/copilot.py`) over either any
+  **OpenAI-compatible** `/chat/completions` endpoint (free tiers of Groq,
+  Google Gemini or OpenRouter, a local Ollama, or a self-hosted vLLM;
+  `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL`) or **Claude** via the Messages
+  API (`ANTHROPIC_API_KEY`; effort `medium`, server-side model fallbacks,
+  cached system prompt). `LLM_PROVIDER=auto` picks the OpenAI-compatible
+  endpoint when `LLM_BASE_URL` is set, else Claude when its key is set, else
+  the offline planner. Both loops share the same tools, guardrails and audit.
 * **Tools (8):** `get_fleet_summary`, `list_at_risk_vehicles`,
   `get_vehicle_health`, `search_alerts`, `search_fault_knowledge`,
   `idle_cost_report`, `driver_safety_report`, `propose_work_order`. Strict
@@ -124,7 +129,11 @@ calls over the same APIs the UI uses, and can queue a work order for approval.
 | Audit | Question, tools, arguments, proposals, token usage and latency in the audit chain |
 | Cost | Token usage per answer recorded and priced at configurable list prices (`LLM_USD_PER_MTOK_IN/OUT`); Prometheus counters for tokens |
 
-Latency: offline answers take 10–100 ms (measured). LLM mode was not exercised
-in the build environment (no API key); its latency is dominated by model time
-per tool round and is off every real-time path. Set `ANTHROPIC_API_KEY` to
-enable it; the UI shows which mode answered.
+Latency: offline answers take 10–100 ms (measured). The OpenAI-compatible loop
+is covered by unit tests against a mocked server (tool calls, missing IDs,
+invalid arguments, tool budget, role-filtered tools, provider errors) and was
+run end to end through the API against a stand-in server, executing the real
+tools under RLS. No live provider was called in the build environment (no
+key); LLM latency is dominated by model time per tool round and is off every
+real-time path. Free endpoints default to a $0 cost estimate unless
+`LLM_USD_PER_MTOK_IN/OUT` are set.

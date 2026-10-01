@@ -19,8 +19,9 @@ terraform output -json helm_values     # endpoints for values-aws.yaml
 Then install cluster add-ons (ingress-nginx, cert-manager, External Secrets
 Operator with the `external_secrets_role_arn`, optionally KEDA and the
 Altinity ClickHouse operator using the `olap` node group and S3 cold tier),
-put the three out-of-band secrets (`jwt-private-key-pem`, `ingest-api-keys`,
-`anthropic-api-key`) into Secrets Manager, and deploy:
+put the out-of-band secrets (`jwt-private-key-pem`, `ingest-api-keys`,
+`llm-api-key`, `anthropic-api-key`; a placeholder for whichever LLM key you do
+not use) into Secrets Manager, and deploy:
 
 ```bash
 helm upgrade --install fleetpulse deploy/helm/fleetpulse -n fleetpulse --create-namespace \
