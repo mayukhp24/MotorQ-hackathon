@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import type { LatLngBounds } from "leaflet";
+import type { LatLngBounds, Map as LeafletMap } from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { useMemo, useState } from "react";
 import { CircleMarker, GeoJSON, MapContainer, TileLayer, Tooltip, useMapEvents } from "react-leaflet";
@@ -42,7 +42,10 @@ export default function LiveMap() {
   const [zoom, setZoom] = useState(5);
   const [bounds, setBounds] = useState<LatLngBounds | null>(null);
   const [tiles, setTiles] = useState<"on" | "off">("on");
+  const [map, setMap] = useState<LeafletMap | null>(null);
   const detail = zoom >= 11 && bounds;
+  // Clicking a cluster flies into it: country -> city cells -> individual vehicles.
+  const zoomInto = (c: Cell) => map?.flyTo([c.lat, c.lon], zoom < 6 ? 8 : Math.max(11, zoom + 2), { duration: 0.9 });
   const precision = precisionFor(zoom);
 
   const cells = useQuery({
@@ -73,11 +76,11 @@ export default function LiveMap() {
     <>
       <PageHeader title="Live map" subtitle={detail
         ? `${fmtInt(vehicles.data?.items.length ?? 0)} vehicles in view · refreshed every 3 s`
-        : `${fmtInt(total)} online vehicles, clustered by geohash-${precision} cells · zoom in past level 11 for individual vehicles`}
+        : `${fmtInt(total)} online vehicles, clustered by geohash-${precision} cells · click a cluster (or zoom in) for individual vehicles`}
         actions={<Segmented value={tiles} onChange={setTiles} options={[{ value: "on", label: "Street map" }, { value: "off", label: "Outline only" }]} />} />
       <Card pad={false} className="overflow-hidden">
         <div className="h-[calc(100vh-230px)] min-h-[420px]">
-          <MapContainer center={[20.6, 78.9]} zoom={5} minZoom={4} maxZoom={16} className="h-full w-full" preferCanvas
+          <MapContainer ref={setMap} center={[20.6, 78.9]} zoom={5} minZoom={4} maxZoom={16} className="h-full w-full" preferCanvas
             whenReady={() => undefined}>
             <GeoJSON key={resolved} data={india} style={{ color: colors.axis, weight: 1, fillColor: colors.surface1, fillOpacity: 0.6 }} />
             {tiles === "on" && <TileLayer key={resolved} url={tileUrl} maxZoom={19} referrerPolicy="strict-origin-when-cross-origin"
@@ -86,8 +89,9 @@ export default function LiveMap() {
             <Viewport onChange={(z, b) => { setZoom(z); setBounds(b); }} />
             {!detail && (cells.data?.cells ?? []).map((c) => (
               <CircleMarker key={c.geohash} center={[c.lat, c.lon]} radius={6 + Math.sqrt(c.count / maxCount) * 26}
-                pathOptions={{ color: colors.surface1, weight: 2, fillColor: colors.series[0], fillOpacity: 0.72 }}>
-                <Tooltip direction="top"><strong>{fmtInt(c.count)}</strong> vehicles online · cell {c.geohash}</Tooltip>
+                pathOptions={{ color: colors.surface1, weight: 2, fillColor: colors.series[0], fillOpacity: 0.72 }}
+                eventHandlers={{ click: () => zoomInto(c) }}>
+                <Tooltip direction="top"><strong>{fmtInt(c.count)}</strong> vehicles online · cell {c.geohash} · click to zoom in</Tooltip>
               </CircleMarker>
             ))}
             {detail && (vehicles.data?.items ?? []).map((v) => (

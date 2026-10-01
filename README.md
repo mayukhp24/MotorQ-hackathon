@@ -85,7 +85,9 @@ pipeline, API, web app and monitoring. First build takes 5–10 minutes.
 
 Try it: `scripts/send-sample.py` posts one payload per OEM format;
 `scripts/send-sample.py pinnacle --corrupt` shows a bad record going to the
-DLQ while the rest of the batch is accepted.
+DLQ while the rest of the batch is accepted. On Windows without Python,
+`scripts\demo.ps1` runs these (and the overheat acceptance test and a
+processor kill) in a container; see the [demo script](docs/demo-script.md).
 
 Smaller machine? `SIM_VEHICLES=20000 SEED_HISTORY_DAYS=21 docker compose up -d --build`
 (the simulator and the seed must use the same vehicle count).

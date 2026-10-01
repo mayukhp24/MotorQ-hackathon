@@ -22,7 +22,8 @@ export function ChartTooltip({ active, payload, label, labelFormatter, valueForm
   const rows = payload as Row[];
   return (
     <div className="rounded-lg border border-line bg-surface-1 px-3 py-2 text-xs shadow-lg">
-      <div className="mb-1 font-medium text-ink-1">{labelFormatter ? labelFormatter(label) : String(label)}</div>
+      {/* Recharts can report an active point before its label (pointer resting on a chart as it mounts). */}
+      {label != null && <div className="mb-1 font-medium text-ink-1">{labelFormatter ? labelFormatter(label) : String(label)}</div>}
       {rows.map((p) => (
         <div key={String(p.dataKey)} className="flex items-center justify-between gap-4">
           <span className="inline-flex items-center gap-1.5 text-ink-2">

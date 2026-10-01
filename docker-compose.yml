@@ -300,6 +300,26 @@ services:
       - ./deploy/observability/grafana/provisioning:/etc/grafana/provisioning:ro
       - ./deploy/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
 
+  # ------------------------------------------------------------ demo (opt-in)
+  # Python with the BDD tools on the stack network, so the demo helpers run
+  # without installing Python on the host: docker compose --profile demo up -d
+  demo-tools:
+    image: python:3.12-slim
+    profiles: ["demo"]
+    working_dir: /w
+    volumes:
+      - ./:/w:ro
+      - ${EXTRA_CA_FILE:-./deploy/no-extra-ca.pem}:/extra-ca.pem:ro   # TLS-inspecting proxy, as for builds
+    environment:
+      PYTHONDONTWRITEBYTECODE: "1"
+      PIP_DISABLE_PIP_VERSION_CHECK: "1"
+      INGEST_URL: http://ingest-gateway:8080
+      BASE_URL: http://web:8080
+      INGEST_API_KEYS: ${INGEST_API_KEYS:-aurora:aurora-local-key,pinnacle:pinnacle-local-key,stellar:stellar-local-key}
+      DEMO_PASSWORD: ${SEED_DEMO_PASSWORD:-FleetPulse!2026}
+    entrypoint: ["sh", "-c", "if [ -s /extra-ca.pem ]; then cat /etc/ssl/certs/ca-certificates.crt /extra-ca.pem > /tmp/ca.pem; export PIP_CERT=/tmp/ca.pem; fi;
+                  pip install -q --root-user-action=ignore behave==1.2.6 requests==2.32.3 && exec sleep infinity"]
+
 # Optional corporate TLS-inspection CA for image builds only (never shipped):
 #   EXTRA_CA_FILE=/path/to/ca.pem docker compose up -d --build
 secrets:
