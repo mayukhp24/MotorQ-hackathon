@@ -127,7 +127,7 @@ Behind a TLS-inspecting proxy, build with `EXTRA_CA_FILE=/path/to/ca.pem`.
 | Go unit + contract | `cd services/pipeline && go test -race ./...` | 84 tests, 84.3% coverage |
 | API unit + Testcontainers integration | `cd services/fleet-api && pip install -e ".[test]" && pytest --cov=app` | 80 tests, 88% |
 | Analytics unit + Testcontainers | `cd services/analytics && pip install -e ".[test]" && pytest --cov=analytics` | 16 tests, 90% |
-| Web | `cd services/web && npm ci && npm test` | 16 tests |
+| Web | `cd services/web && npm ci && npm test` | 17 tests |
 | BDD acceptance (stack running) | `cd tests/bdd && behave features` | 9 scenarios pass |
 | Load | `k6 run -e BASE_URL=http://localhost:8000 tests/load/api.js` | 100 req/s: p95 135 ms, p99 408 ms, 0 errors |
 | Chaos | `python tests/chaos/chaos.py` | 5/5 experiments pass |

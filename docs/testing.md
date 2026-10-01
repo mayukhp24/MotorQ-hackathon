@@ -5,7 +5,7 @@
 | Unit – Go pipeline | `go test -race` | 84 tests + 6 benchmarks | pass; **84.3%** statement coverage of pipeline logic (gate 80%; excludes DB/Kafka wiring exercised end to end) | yes |
 | Unit – Fleet API | pytest, fakeredis, httpx mock transport | 63 | pass | yes |
 | Unit – analytics | pytest | 10 | pass | yes |
-| Unit – web | Vitest, Testing Library | 16 | pass | yes |
+| Unit – web | Vitest, Testing Library | 17 | pass | yes |
 | Integration – API | pytest + **Testcontainers** (PostgreSQL 16 + pgvector with every migration, Redis) | 17 (80 API tests in total) | pass; API coverage **88%** (gate 80%) | yes |
 | Integration – analytics jobs | pytest + Testcontainers (real PostgreSQL, production writer role) | 6 | pass; analytics coverage **90%** (gate 80%) | yes |
 | Contract | Go: producer structs vs JSON Schemas; ClickHouse DDL covers every contract field | 2 suites (3,000 telemetry, 689 alerts, 321 trips validated per run) | pass | yes |

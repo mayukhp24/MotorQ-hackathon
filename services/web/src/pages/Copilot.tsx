@@ -41,7 +41,11 @@ export default function Copilot() {
       if (t.proposed_actions.length) qc.invalidateQueries({ queryKey: ["actions"] });
     },
   });
-  useEffect(() => end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }), [msgs, chat.isPending]);
+  // Block body: scroll methods return a Promise in newer browsers (Chrome/Edge 150+), and React would
+  // call a returned value as the effect's cleanup ("is not a function").
+  useEffect(() => {
+    end.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [msgs, chat.isPending]);
 
   function send(text: string) {
     if (!text.trim() || chat.isPending) return;
