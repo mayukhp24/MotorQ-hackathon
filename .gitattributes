@@ -1,0 +1,19 @@
+# Check out text files with LF line endings on every OS. Scripts and configs are
+# mounted into Linux containers, where CRLF breaks them (e.g. "set: illegal option -").
+* text=auto eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.docx binary
+*.xlsx binary
+*.pptx binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.joblib binary
+*.parquet binary

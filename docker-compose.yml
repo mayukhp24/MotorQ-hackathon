@@ -109,7 +109,8 @@ services:
     image: eclipse-mosquitto:2.0
     restart: unless-stopped
     ports: ["1883:1883"]
-    entrypoint: ["/bin/sh", "/mosquitto/config/entrypoint.sh"]
+    # The script is run with carriage returns stripped so a Windows (CRLF) checkout still starts.
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /mosquitto/config/entrypoint.sh > /tmp/entrypoint.sh && exec /bin/sh /tmp/entrypoint.sh"]
     environment:
       MQTT_GATEWAY_PASSWORD: ${MQTT_GATEWAY_PASSWORD:-gateway-local-only}
       MQTT_CONNECTOR_PASSWORD: ${MQTT_CONNECTOR_PASSWORD:-connector-local-only}
