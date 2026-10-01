@@ -140,7 +140,7 @@ function AlertTrend({ className }: { className?: string }) {
               <Tooltip content={<ChartTooltip labelFormatter={(l) => new Date(String(l)).toDateString()} />} />
               {[...SEVERITIES].reverse().map((sev, i) => (
                 <Bar key={sev} dataKey={sev} name={sev[0] + sev.slice(1).toLowerCase()} stackId="a" fill={color[sev]}
-                  stroke={ax.colors.surface1} strokeWidth={2} radius={i === SEVERITIES.length - 1 ? [4, 4, 0, 0] : 0} isAnimationActive={false} />
+                  stroke={ax.colors.surface1} strokeWidth={2} radius={i === SEVERITIES.length - 1 ? [4, 4, 0, 0] : 0} animationDuration={600} animationEasing="ease-out" />
               ))}
             </BarChart>
           </ResponsiveContainer>

@@ -57,7 +57,7 @@ function IdleSection({ days }: { days: number }) {
                   <XAxis dataKey="day" {...ax.x} tickFormatter={(v) => new Date(v).toLocaleDateString("en-GB", { day: "2-digit", month: "short" })} />
                   <YAxis {...ax.y} tickFormatter={fmtCompact} />
                   <Tooltip content={<ChartTooltip labelFormatter={(l) => new Date(String(l)).toDateString()} valueFormatter={(v) => `${fmtInt(v)} h`} />} />
-                  <Bar dataKey="idle_h" name="Idle hours" fill={ax.colors.series[1]} radius={[4, 4, 0, 0]} isAnimationActive={false} />
+                  <Bar dataKey="idle_h" name="Idle hours" fill={ax.colors.series[1]} radius={[4, 4, 0, 0]} animationDuration={600} animationEasing="ease-out" />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -94,7 +94,7 @@ function DriverSection({ days }: { days: number }) {
                 <XAxis dataKey="band" {...ax.x} interval={0} tick={{ fill: ax.colors.text3, fontSize: 10 }} />
                 <YAxis {...ax.y} scale="sqrt" tickFormatter={fmtCompact} />
                 <Tooltip content={<ChartTooltip labelFormatter={(l) => `Score ${l}`} valueFormatter={(v) => `${fmtInt(v)} drivers`} />} />
-                <Bar dataKey="drivers" name="Drivers" radius={[4, 4, 0, 0]} isAnimationActive={false}>
+                <Bar dataKey="drivers" name="Drivers" radius={[4, 4, 0, 0]} animationDuration={600} animationEasing="ease-out">
                   {d.distribution.map((x) => <Cell key={x.score_from} fill={x.score_from < 60 ? ax.colors.status.serious : ax.colors.series[0]} />)}
                 </Bar>
               </BarChart>

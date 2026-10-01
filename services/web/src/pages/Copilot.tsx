@@ -61,16 +61,23 @@ export default function Copilot() {
         <Card pad={false} className="flex h-[calc(100vh-220px)] min-h-[480px] flex-col" bodyClassName="flex min-h-0 flex-1 flex-col">
           <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-5">
             {msgs.length === 0 && (
-              <div className="mx-auto max-w-xl pt-8 text-center">
+              <div className="anim-fade-up mx-auto max-w-xl pt-8 text-center">
                 <Bot className="mx-auto h-8 w-8 text-accent" />
                 <p className="mt-3 text-sm text-ink-2">Try one of these:</p>
                 <div className="mt-3 flex flex-wrap justify-center gap-2">
-                  {SUGGESTIONS.map((s) => <button key={s} className="btn-outline text-left" onClick={() => send(s)}>{s}</button>)}
+                  {SUGGESTIONS.map((s, i) => (
+                    <button key={s} className="btn-outline anim-fade-up text-left hover:border-accent" style={{ animationDelay: `${80 + i * 50}ms` }} onClick={() => send(s)}>{s}</button>
+                  ))}
                 </div>
               </div>
             )}
             {msgs.map((m, i) => <Bubble key={i} m={m} />)}
-            {chat.isPending && <div className="flex items-center gap-2 text-sm text-ink-3"><Bot className="h-4 w-4" /> Thinking and querying fleet data…</div>}
+            {chat.isPending && (
+              <div className="anim-fade-in flex items-center gap-2 text-sm text-ink-3" role="status">
+                <Bot className="h-4 w-4" /> Thinking and querying fleet data
+                <span className="inline-flex gap-1 pl-0.5" aria-hidden><span className="typing-dot" /><span className="typing-dot" /><span className="typing-dot" /></span>
+              </div>
+            )}
             {chat.error && <ErrorNote error={chat.error} />}
             <div ref={end} />
           </div>
@@ -88,7 +95,7 @@ export default function Copilot() {
 function Bubble({ m }: { m: Msg }) {
   const Icon = m.role === "user" ? User : Bot;
   return (
-    <div className={m.role === "user" ? "flex justify-end" : "flex"}>
+    <div className={m.role === "user" ? "anim-pop-in flex justify-end" : "anim-pop-in flex"}>
       <div className={m.role === "user" ? "max-w-[80%] rounded-2xl rounded-br-md bg-accent px-4 py-2.5 text-sm text-white" : "max-w-[92%]"}>
         {m.role === "assistant" ? (
           <div className="flex gap-3">
@@ -132,7 +139,7 @@ function Approvals({ canApprove }: { canApprove: boolean }) {
       {(q.data?.items.length ?? 0) === 0 ? <Empty>No proposals waiting. Ask the copilot to schedule a repair for a vehicle.</Empty> : (
         <ul className="divide-y divide-line">
           {q.data!.items.map((a) => (
-            <li key={a.action_id} className="px-4 py-3 sm:px-5">
+            <li key={a.action_id} className="anim-fade-up px-4 py-3 sm:px-5">
               <div className="flex items-center gap-2 text-sm font-medium text-ink-1"><Wrench className="h-4 w-4 text-ink-3" /> Work order · {a.arguments.priority}</div>
               <div className="mono mt-1 text-ink-2">{a.arguments.vin}</div>
               <div className="mt-1 text-xs text-ink-3">{a.arguments.reason}</div>

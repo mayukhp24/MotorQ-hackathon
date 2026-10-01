@@ -97,7 +97,7 @@ export function RiskBar({ risk }: { risk: number | null | undefined }) {
   return (
     <div className="flex items-center gap-2" title={`${(risk * 100).toFixed(1)}% probability of breakdown within 7 days`}>
       <div className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-2">
-        <div className="h-full rounded-full" style={{ width: `${Math.max(3, risk * 100)}%`, background: `var(--status-${tone})` }} />
+        <div className="anim-grow-x h-full rounded-full" style={{ width: `${Math.max(3, risk * 100)}%`, background: `var(--status-${tone})` }} />
       </div>
       <span className="w-10 text-right text-sm tabular-nums text-ink-1">{(risk * 100).toFixed(0)}%</span>
     </div>
@@ -106,19 +106,19 @@ export function RiskBar({ risk }: { risk: number | null | undefined }) {
 
 export function Spinner({ label = "Loading" }: { label?: string }) {
   return (
-    <div className="flex items-center justify-center gap-2 p-8 text-sm text-ink-3">
+    <div className="anim-delayed-in flex items-center justify-center gap-2 p-8 text-sm text-ink-3">
       <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> {label}…
     </div>
   );
 }
 
 export function Empty({ children }: { children: ReactNode }) {
-  return <div className="p-8 text-center text-sm text-ink-3">{children}</div>;
+  return <div className="anim-fade-in p-8 text-center text-sm text-ink-3">{children}</div>;
 }
 
 export function ErrorNote({ error }: { error: unknown }) {
   const msg = error instanceof Error ? error.message : String(error);
-  return <div className="rounded-lg border border-line bg-surface-2 p-3 text-sm text-ink-2">Couldn't load this: {msg}</div>;
+  return <div className="anim-fade-in rounded-lg border border-line bg-surface-2 p-3 text-sm text-ink-2">Couldn't load this: {msg}</div>;
 }
 
 export function Segmented<T extends string>({ value, options, onChange }: {
@@ -133,7 +133,7 @@ export function Segmented<T extends string>({ value, options, onChange }: {
           aria-selected={value === o.value}
           onClick={() => onChange(o.value)}
           className={clsx(
-            "rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
+            "rounded-md px-2.5 py-1 text-xs font-medium transition duration-200 ease-out",
             value === o.value ? "bg-surface-1 text-ink-1 shadow-card" : "text-ink-2 hover:text-ink-1",
           )}
         >

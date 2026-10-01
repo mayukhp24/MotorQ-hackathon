@@ -81,7 +81,7 @@ function RiskTab({ summary }: { summary?: Summary }) {
                 <XAxis type="number" {...ax.x} />
                 <YAxis type="category" dataKey="name" {...ax.y} width={150} />
                 <Tooltip content={<ChartTooltip valueFormatter={(v) => v.toFixed(1)} />} />
-                <Bar dataKey="expected" name="Expected breakdowns" fill={ax.colors.series[0]} radius={[0, 4, 4, 0]} isAnimationActive={false} />
+                <Bar dataKey="expected" name="Expected breakdowns" fill={ax.colors.series[0]} radius={[0, 4, 4, 0]} animationDuration={600} animationEasing="ease-out" />
               </BarChart>
             </ResponsiveContainer>
           </div>

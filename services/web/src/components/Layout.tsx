@@ -89,13 +89,13 @@ export default function Layout() {
         </aside>
         {open && (
           <div className="fixed inset-0 z-[1000] flex lg:hidden">
-            <div className="w-64 border-r border-line bg-surface-3">
+            <div className="anim-slide-in-left w-64 border-r border-line bg-surface-3 shadow-xl">
               <div className="flex justify-end p-2">
                 <button className="btn-ghost px-2" onClick={() => setOpen(false)} aria-label="Close menu"><X className="h-4 w-4" /></button>
               </div>
               <Sidebar onNavigate={() => setOpen(false)} />
             </div>
-            <div className="flex-1 bg-black/40" onClick={() => setOpen(false)} />
+            <div className="anim-fade-in flex-1 bg-black/40" onClick={() => setOpen(false)} />
           </div>
         )}
         <div className="flex min-w-0 flex-1 flex-col">
@@ -113,7 +113,7 @@ export default function Layout() {
             <button className="btn-ghost px-2" onClick={logout} title="Sign out" aria-label="Sign out"><LogOut className="h-4 w-4" /></button>
           </header>
           <main className="min-w-0 flex-1 overflow-y-auto px-4 py-6 sm:px-6">
-            <div className="mx-auto max-w-[1400px]"><ErrorBoundary key={pathname}><Outlet /></ErrorBoundary></div>
+            <div className="mx-auto max-w-[1400px]"><ErrorBoundary key={pathname}><div className="page-enter"><Outlet /></div></ErrorBoundary></div>
           </main>
         </div>
       </div>

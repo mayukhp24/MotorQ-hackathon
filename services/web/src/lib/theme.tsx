@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
 type Mode = "light" | "dark" | "system";
 interface ThemeState {
@@ -66,8 +66,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   const resolved: "light" | "dark" = mode === "system" ? (osDark ? "dark" : "light") : mode;
 
+  const firstApply = useRef(true);
   useEffect(() => {
     const el = document.documentElement;
+    if (!firstApply.current) {  // cross-fade colours on a switch (not on first paint)
+      el.classList.add("theme-anim");
+      window.setTimeout(() => el.classList.remove("theme-anim"), 350);
+    }
+    firstApply.current = false;
     if (mode === "system") el.removeAttribute("data-theme");
     else el.setAttribute("data-theme", mode);
     // Charts need concrete colours (SVG attributes cannot resolve var()).

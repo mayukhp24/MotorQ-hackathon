@@ -39,7 +39,7 @@ export default function Login() {
           <div className="grid h-9 w-9 place-items-center rounded-lg bg-[#3987e5]"><Activity className="h-5 w-5" /></div>
           <span className="text-lg font-semibold">FleetPulse</span>
         </div>
-        <div className="max-w-md">
+        <div className="anim-fade-up max-w-md" style={{ animationDelay: "120ms" }}>
           <h1 className="text-3xl font-semibold leading-tight">Know which vehicles will break down — before they do.</h1>
           <p className="mt-4 text-[15px] leading-relaxed text-white/75">
             Real-time telemetry from 100,000 connected vehicles across three OEM clouds, turned into 7-day breakdown
@@ -59,7 +59,7 @@ export default function Login() {
         </svg>
       </div>
       <div className="flex items-center justify-center p-6">
-        <form onSubmit={submit} className="w-full max-w-sm">
+        <form onSubmit={submit} className="anim-fade-up w-full max-w-sm">
           <h2 className="text-xl font-semibold text-ink-1">Sign in</h2>
           <p className="mt-1 text-sm text-ink-2">Use a demo account below. The password is in the README.</p>
           <label className="mt-6 block text-sm font-medium text-ink-1" htmlFor="email">Email</label>
@@ -76,7 +76,7 @@ export default function Login() {
             <div className="grid gap-1.5">
               {DEMO.map((d) => (
                 <button type="button" key={d.email} onClick={() => setEmail(d.email)}
-                  className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-left text-sm hover:bg-surface-2">
+                  className="flex items-center justify-between rounded-lg border border-line px-3 py-2 text-left text-sm transition duration-150 hover:border-accent hover:bg-surface-2 active:scale-[0.99]">
                   <span className="font-medium text-ink-1">{d.role}</span>
                   <span className="text-xs text-ink-3">{d.tenant}</span>
                 </button>
